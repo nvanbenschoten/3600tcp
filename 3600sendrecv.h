@@ -20,6 +20,7 @@ typedef struct header_t {
 } header;
 
 unsigned int MAGIC;
+unsigned int WINDOW_SIZE;
 
 void dump_packet(unsigned char *data, int size);
 header *make_header(int sequence, int length, int eof, int ack);
