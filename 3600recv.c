@@ -123,7 +123,7 @@ int main() {
                         write(1, &data_buf[buffer_index * buf_len], buf_length[buffer_index]);
                         
                         // Invalidate buf_length
-                        buf_length[buffer_index] = -1;
+                        buf_length[buffer_index] = 0;
                         
                         // Increment current packet and find new buffer index
                         current_packet++;
