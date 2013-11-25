@@ -24,7 +24,7 @@
 
 static int DATA_SIZE = 1460;
 
-unsigned int sequence = 0;
+unsigned short sequence = 0;
 
 void usage() {
     printf("Usage: 3600send host:port\n");
@@ -51,7 +51,7 @@ void *get_next_packet(int sequence, int *len) {
         return NULL;
     }
 
-    header *myheader = make_header(sequence, data_len, 0, 0);
+    header *myheader = make_header((short)sequence, data_len, 0, 0);
     void *packet = malloc(sizeof(header) + data_len);
     memcpy(packet, myheader, sizeof(header));
     memcpy(((char *) packet) +sizeof(header), data, data_len);
@@ -133,12 +133,12 @@ int main(int argc, char *argv[]) {
 
     // construct the timeout
     struct timeval t;
-    t.tv_sec = 1;
-    t.tv_usec = 0; // 10 ms
+    t.tv_sec = SENDER_TIMEOUT_SEC;
+    t.tv_usec = SENDER_TIMEOUT_MICRO; // 10 ms
 
     // packet tracking vars
-    unsigned int p_ack = 0;
-    unsigned int p_created = 1;
+    unsigned short p_ack = 0;
+    unsigned short p_created = 1;
     //int p_sent = 0;
     //void *packet;
     //int p_off = 0;
@@ -190,8 +190,8 @@ int main(int argc, char *argv[]) {
         // check for received packets
         FD_ZERO(&socks);
         FD_SET(sock, &socks);
-        t.tv_sec = 1;
-        t.tv_usec = 0;
+        t.tv_sec = SENDER_TIMEOUT_SEC;
+        t.tv_usec = SENDER_TIMEOUT_MICRO;
 
         // wait to receive, or for a timeout
         // loop while still receiving packets/data every 10 ms
@@ -213,8 +213,8 @@ int main(int argc, char *argv[]) {
             } else {
                 mylog("[recv corrupted ack] %x %d\n", MAGIC, sequence);
             }
-            FD_ZERO(&socks);
-            FD_SET(sock, &socks);
+            //FD_ZERO(&socks);
+            //FD_SET(sock, &socks);
         } /*else {
             mylog("[error] timeout occurred\n");
         }*/
