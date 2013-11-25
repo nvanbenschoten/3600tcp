@@ -146,14 +146,14 @@ int main(int argc, char *argv[]) {
     int p_len[WINDOW_SIZE] = {0};
     int more_packets = 1;
     unsigned int i = 0;
-    int done = 0;
+    //int done = 0;
 
     // allocate memory buffers for packets
     for (i = 0; i < WINDOW_SIZE; i++) {
         packets[i] = calloc(1, 1500);
     }
 
-    while (!done) {
+    while (1) {
     //while (send_next_packet(sock, out)) {
 
         // get the next packets to send if necessary in window
@@ -162,7 +162,7 @@ int main(int argc, char *argv[]) {
             //memcpy(&(packets[p_created%10]), get_next_packet(p_created, &(p_len[p_created%10])), p_len[p_created%10]);
              
             if (packets[p_created%WINDOW_SIZE] == NULL) { 
-                mylog("no more data that needs packets\n");
+                //mylog("no more data that needs packets\n");
                 //p_created--;
                 more_packets = 0;
             }
@@ -171,7 +171,7 @@ int main(int argc, char *argv[]) {
             //}
             else {
                 p_created++;
-                mylog("p_created: %d\n", p_created);
+                //mylog("p_created: %d\n", p_created);
             }
         }
 
@@ -219,8 +219,9 @@ int main(int argc, char *argv[]) {
             mylog("[error] timeout occurred\n");
         }*/
         if (!more_packets && p_ack+1 == p_created) {
-            mylog("done, all packets acked\n");
-            done = 1;
+            //mylog("done, all packets acked\n");
+            //done = 1;
+            break;
         }
     }
     //}
