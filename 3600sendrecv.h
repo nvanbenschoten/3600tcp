@@ -11,6 +11,8 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+#define WINDOW_SIZE 100
+
 typedef struct header_t {
   unsigned int magic:14;
   unsigned int ack:1;
@@ -20,7 +22,6 @@ typedef struct header_t {
 } header;
 
 unsigned int MAGIC;
-unsigned int WINDOW_SIZE;
 
 void dump_packet(unsigned char *data, int size);
 header *make_header(int sequence, int length, int eof, int ack);
