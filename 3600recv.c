@@ -139,8 +139,10 @@ int main() {
                     
                     int buffer_index = myheader->sequence % WINDOW_SIZE;
                     
-                    if (buf_length[buffer_index] == 0)
+                    if (buf_length[buffer_index] == 0) {
                         buf_length[buffer_index] = myheader->length;
+                        memcpy(&data_buf[buffer_index*buf_len], data, myheader->length);
+                    }
                 }
 
                 mylog("[recv data] %d (%d) %s\n", myheader->sequence, myheader->length, "ACCEPTED (in-order)");
