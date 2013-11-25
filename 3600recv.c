@@ -84,8 +84,8 @@ int main() {
     assert(buf_length != NULL);
 
     // current counter
-    unsigned int current_packet = 0;
-    
+    unsigned int current_packet = 1;
+   
     // wait to receive, or for a timeout
     while (1) {
         FD_ZERO(&socks);
@@ -118,7 +118,7 @@ int main() {
                     current_packet++;
 
                     unsigned int buffer_index = current_packet % WINDOW_SIZE;
-
+                    
                     while(buf_length[buffer_index] > 0) {
                         write(1, &data_buf[buffer_index * buf_len], buf_length[buffer_index]);
                         
@@ -136,15 +136,17 @@ int main() {
                 else {
                     // Is not the current packet
                     // Add to buffer and set length
-
+                    
                     int buffer_index = myheader->sequence % WINDOW_SIZE;
-                    buf_length[buffer_index] = myheader->length;
+                    
+                    if (buf_length[buffer_index] == 0)
+                        buf_length[buffer_index] = myheader->length;
                 }
 
                 mylog("[recv data] %d (%d) %s\n", myheader->sequence, myheader->length, "ACCEPTED (in-order)");
                 mylog("[send ack] %d\n", current_packet);
 
-                header *responseheader = make_header(current_packet, 0, myheader->eof, 1);
+                header *responseheader = make_header(current_packet - 1, 0, myheader->eof, 1);
                 if (sendto(sock, responseheader, sizeof(header), 0, (struct sockaddr *) &in, (socklen_t) sizeof(in)) < 0) {
                     perror("sendto");
                     free(buf);
