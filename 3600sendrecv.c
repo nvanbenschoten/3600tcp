@@ -24,7 +24,7 @@
 #include "3600sendrecv.h"
 
 unsigned int MAGIC = 0x0bee;
-unsigned int WINDOW_SIZE = 10;
+unsigned int WINDOW_SIZE = 100;
 
 char ts[16];
 

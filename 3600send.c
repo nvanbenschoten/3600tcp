@@ -134,7 +134,7 @@ int main(int argc, char *argv[]) {
     // construct the timeout
     struct timeval t;
     t.tv_sec = 0;
-    t.tv_usec = 10000; // 10 ms
+    t.tv_usec = 500000; // 10 ms
 
     // packet tracking vars
     unsigned int p_ack = 0;
@@ -142,14 +142,14 @@ int main(int argc, char *argv[]) {
     //int p_sent = 0;
     //void *packet;
     //int p_off = 0;
-    void * packets[10] = {0};
-    int p_len[10] = {0};
+    void * packets[WINDOW_SIZE] = {0};
+    int p_len[WINDOW_SIZE] = {0};
     int more_packets = 1;
     unsigned int i = 0;
     int done = 0;
 
     // allocate memory buffers for packets
-    for (i = 0; i < 10; i++) {
+    for (i = 0; i < WINDOW_SIZE; i++) {
         packets[i] = calloc(1, 1500);
     }
 
@@ -157,11 +157,11 @@ int main(int argc, char *argv[]) {
     //while (send_next_packet(sock, out)) {
 
         // get the next packets to send if necessary in window
-        while (more_packets && p_created-p_ack < 10) {
-            packets[p_created%10] = get_next_packet(p_created, &(p_len[p_created%10])); // 
+        while (more_packets && p_created-p_ack < WINDOW_SIZE) {
+            packets[p_created%WINDOW_SIZE] = get_next_packet(p_created, &(p_len[p_created%WINDOW_SIZE])); // 
             //memcpy(&(packets[p_created%10]), get_next_packet(p_created, &(p_len[p_created%10])), p_len[p_created%10]);
              
-            if (packets[p_created%10] == NULL) { 
+            if (packets[p_created%WINDOW_SIZE] == NULL) { 
                 more_packets = 0;
             }
             //else {
@@ -174,11 +174,11 @@ int main(int argc, char *argv[]) {
 
         // send non-acked packets in window
         for (i = p_ack; i < p_created; i++) {
-            if (sendto(sock, packets[i%10], p_len[i%10], 0, (struct sockaddr *) &out, (socklen_t) sizeof(out)) < 0) {
+            if (sendto(sock, packets[i%WINDOW_SIZE], p_len[i%WINDOW_SIZE], 0, (struct sockaddr *) &out, (socklen_t) sizeof(out)) < 0) {
                 perror("sendto");
                 exit(1);
             }
-            mylog("[send data] %d (%d)\n", i, p_len[i%10] - sizeof(header)); // 
+            mylog("[send data] %d (%d)\n", i, p_len[i%WINDOW_SIZE] - sizeof(header)); // 
         }
         
         //int done = 0;
