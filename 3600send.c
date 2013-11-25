@@ -133,7 +133,7 @@ int main(int argc, char *argv[]) {
 
     // construct the timeout
     struct timeval t;
-    t.tv_sec = 5;
+    t.tv_sec = 1;
     t.tv_usec = 0; // 10 ms
 
     // packet tracking vars
@@ -190,7 +190,7 @@ int main(int argc, char *argv[]) {
         // check for received packets
         FD_ZERO(&socks);
         FD_SET(sock, &socks);
-        t.tv_sec = 5;
+        t.tv_sec = 1;
         t.tv_usec = 0;
 
         // wait to receive, or for a timeout
