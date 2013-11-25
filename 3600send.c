@@ -134,7 +134,7 @@ int main(int argc, char *argv[]) {
     // construct the timeout
     struct timeval t;
     t.tv_sec = 0;
-    t.tv_usec = 500000; // 10 ms
+    t.tv_usec = 10000; // 10 ms
 
     // packet tracking vars
     unsigned int p_ack = 0;
@@ -173,7 +173,7 @@ int main(int argc, char *argv[]) {
         }
 
         // send non-acked packets in window
-        for (i = p_ack; i < p_created; i++) {
+        for (i = p_ack+1; i < p_created; i++) {
             if (sendto(sock, packets[i%WINDOW_SIZE], p_len[i%WINDOW_SIZE], 0, (struct sockaddr *) &out, (socklen_t) sizeof(out)) < 0) {
                 perror("sendto");
                 exit(1);
