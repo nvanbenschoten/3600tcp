@@ -133,8 +133,8 @@ int main(int argc, char *argv[]) {
 
     // construct the timeout
     struct timeval t;
-    t.tv_sec = 0;
-    t.tv_usec = 10000; // 10 ms
+    t.tv_sec = 5;
+    t.tv_usec = 0; // 10 ms
 
     // packet tracking vars
     unsigned int p_ack = 0;
@@ -163,6 +163,7 @@ int main(int argc, char *argv[]) {
              
             if (packets[p_created%WINDOW_SIZE] == NULL) { 
                 mylog("no more data that needs packets\n");
+                //p_created--;
                 more_packets = 0;
             }
             //else {
@@ -189,6 +190,8 @@ int main(int argc, char *argv[]) {
         // check for received packets
         FD_ZERO(&socks);
         FD_SET(sock, &socks);
+        t.tv_sec = 5;
+        t.tv_usec = 0;
 
         // wait to receive, or for a timeout
         // loop while still receiving packets/data every 10 ms
@@ -210,20 +213,27 @@ int main(int argc, char *argv[]) {
             } else {
                 mylog("[recv corrupted ack] %x %d\n", MAGIC, sequence);
             }
-            //FD_ZERO(&socks);
-            //FD_SET(sock, &socks);
+            FD_ZERO(&socks);
+            FD_SET(sock, &socks);
         } /*else {
             mylog("[error] timeout occurred\n");
         }*/
         if (!more_packets && p_ack+1 == p_created) {
-            mylog("done, all packets acked");
+            mylog("done, all packets acked\n");
             done = 1;
         }
     }
     //}
 
     //send_final_packet(sock, out);
+    header *myheader = make_header(p_created, 0, 1, 0);
+    //mylog("[send eof]\n");
     mylog("[send eof]\n");
+
+    if (sendto(sock, myheader, sizeof(header), 0, (struct sockaddr *) &out, (socklen_t) sizeof(out)) < 0) {
+        perror("sendto");
+        exit(1);
+    }
 
     mylog("[completed]\n");
 
