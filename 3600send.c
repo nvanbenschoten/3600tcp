@@ -134,7 +134,7 @@ int main(int argc, char *argv[]) {
     // construct the timeout
     struct timeval t;
     t.tv_sec = 0;
-    t.tv_usec = 500000; // 10 ms
+    t.tv_usec = 10000; // 10 ms
 
     // packet tracking vars
     unsigned int p_ack = 0;
@@ -162,6 +162,7 @@ int main(int argc, char *argv[]) {
             //memcpy(&(packets[p_created%10]), get_next_packet(p_created, &(p_len[p_created%10])), p_len[p_created%10]);
              
             if (packets[p_created%WINDOW_SIZE] == NULL) { 
+                mylog("no more data that needs packets\n");
                 more_packets = 0;
             }
             //else {
@@ -169,11 +170,12 @@ int main(int argc, char *argv[]) {
             //}
             else {
                 p_created++;
+                mylog("p_created: %d\n", p_created);
             }
         }
 
         // send non-acked packets in window
-        for (i = p_ack; i < p_created; i++) {
+        for (i = p_ack+1; i < p_created; i++) {
             if (sendto(sock, packets[i%WINDOW_SIZE], p_len[i%WINDOW_SIZE], 0, (struct sockaddr *) &out, (socklen_t) sizeof(out)) < 0) {
                 perror("sendto");
                 exit(1);
@@ -208,16 +210,20 @@ int main(int argc, char *argv[]) {
             } else {
                 mylog("[recv corrupted ack] %x %d\n", MAGIC, sequence);
             }
+            //FD_ZERO(&socks);
+            //FD_SET(sock, &socks);
         } /*else {
             mylog("[error] timeout occurred\n");
         }*/
-        if (!more_packets && p_ack == p_created) {
+        if (!more_packets && p_ack+1 == p_created) {
+            mylog("done, all packets acked");
             done = 1;
         }
     }
     //}
 
     //send_final_packet(sock, out);
+    mylog("[send eof]\n");
 
     mylog("[completed]\n");
 

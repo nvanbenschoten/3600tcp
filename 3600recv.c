@@ -144,7 +144,7 @@ int main() {
                 }
 
                 mylog("[recv data] %d (%d) %s\n", myheader->sequence, myheader->length, "ACCEPTED (in-order)");
-                mylog("[send ack] %d\n", current_packet);
+                mylog("[send ack] %d\n", current_packet-1);
 
                 header *responseheader = make_header(current_packet - 1, 0, myheader->eof, 1);
                 if (sendto(sock, responseheader, sizeof(header), 0, (struct sockaddr *) &in, (socklen_t) sizeof(in)) < 0) {
