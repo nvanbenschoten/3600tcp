@@ -18,7 +18,10 @@ def remove_failure(find, items):
 
 def get_leaderboard(results_file):
     # run leaderboard script and write current results to a text file
-    ret = call(["ssh", "nat@cs3600tcp.ccs.neu.edu", '"/course/cs3600f13/bin/project4/printstats"', ">", results_file])
+    with open(results_file, 'w') as f:
+        f.truncate()
+        ret = call(["ssh", "nat@cs3600tcp.ccs.neu.edu", '/course/cs3600f13/bin/project4/printstats'], stdout=f)
+        f.close()
     if ret == 0:
         return True
     else:
@@ -59,7 +62,7 @@ def parse_leaderboard(results_file):
                 if fail not in test_failures:
                     test_failures.append(fail)
                     print("Found a test failure:\n")
-                    print(fail)
+                    #print(fail)
                     textAlert(test_details, subtest, rank)
             else:
                 #subtest = leaderboard[i-1].replace(":", "")
@@ -82,8 +85,8 @@ def textAlert(test, subtest, rank):
                             'Subject: 3600tcp Alert',
                             '', message])
         server.sendmail(gmail_info['username'], a, body)
-        print "Sent from %s to %s with message:\n" % (gmail_info['username'], a)
-        print message
+        #print "Sent from %s to %s with message:\n" % (gmail_info['username'], a)
+        #print message
     server.quit()
 
 # read in sensitive info from settings file
@@ -92,10 +95,10 @@ configp = ConfigParser.RawConfigParser()
 configp.read(config_file)
 gmail_info = ast.literal_eval(configp.get('leaderboard', 'gmailinfo'))
 phonenum_emails = configp.get('leaderboard', 'phonenumemails').split(',')
-print gmail_info
-print type(gmail_info)
-print phonenum_emails
-print type(phonenum_emails)
+#print gmail_info
+#print type(gmail_info)
+#print phonenum_emails
+#print type(phonenum_emails)
 # setup other useful things
 results = "current_results.txt"
 usernames = ["nvanben", "nat"]
@@ -103,7 +106,10 @@ test_failures = []
 wait_minutes = 3;
 
 # main loop to check leaderboard
+print("Monitoring leaderboard")
 while 1:
-    get_leaderboard(results)
-    parse_leaderboard(results)
+    ret = get_leaderboard(results)
+    print ret
+    if ret:
+    	parse_leaderboard(results)
     sleep(60 * wait_minutes)
