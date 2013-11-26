@@ -109,7 +109,7 @@ int main() {
             if (myheader->magic == MAGIC) {
                 // Got a valid packet
 
-                if (myheader->sequence == current_packet) {
+                if ((int)myheader->sequence == current_packet) {
                     // Is the current packet
                     // Read from buffer
 
@@ -130,14 +130,14 @@ int main() {
                         buffer_index = current_packet % WINDOW_SIZE;
                     }
                 }
-                else if (myheader->sequence < current_packet) {
+                else if ((int)myheader->sequence < current_packet) {
                     continue;
                 }
                 else {
                     // Is not the current packet
                     // Add to buffer and set length
                     
-                    int buffer_index = myheader->sequence % WINDOW_SIZE;
+                    int buffer_index = (int)myheader->sequence % WINDOW_SIZE;
                     
                     if (buf_length[buffer_index] == 0) {
                         buf_length[buffer_index] = myheader->length;
@@ -145,10 +145,10 @@ int main() {
                     }
                 }
 
-                mylog("[recv data] %d (%d) %s\n", myheader->sequence, myheader->length, "ACCEPTED (in-order)");
+                mylog("[recv data] %d (%d) %s\n", (int)myheader->sequence, myheader->length, "ACCEPTED (in-order)");
                 mylog("[send ack] %d\n", current_packet-1);
 
-                header *responseheader = make_header(current_packet - 1, 0, myheader->eof, 1);
+                header *responseheader = make_header((short)current_packet - 1, 0, myheader->eof, 1);
                 if (sendto(sock, responseheader, sizeof(header), 0, (struct sockaddr *) &in, (socklen_t) sizeof(in)) < 0) {
                     perror("sendto");
                     free(buf);
