@@ -9,8 +9,6 @@ def remove_failure(find, items):
     for fail in items:
         if fail['main'] == find['main'] and fail['sub'] == find['sub']:
             del(items[i])
-            print("Found and removed outdated failure\n")
-            #return True
         else:
             i += 1;
     #return -1
@@ -40,7 +38,6 @@ def parse_leaderboard(results_file):
         if "-----" in line:
             test_details = line.replace("----- ", "").replace(" -----", "").replace("\n", "")
 
-        #print line[0:2]
         if line[0:2] == "1:": # if we are at the leader
             # get the type of the subtest
             subtest = leaderboard[i-1].replace(":", "")
@@ -55,17 +52,12 @@ def parse_leaderboard(results_file):
                     if user in usernames:
                         break
                     j += 1
-                # get the type of the subtest
-                #subtest = leaderboard[i-1].replace(":", "")
                 # send a text message alert that we are failing if not already sent
                 fail = {'main':test_details, 'sub':subtest, 'rank':rank}
                 if fail not in test_failures:
                     test_failures.append(fail)
-                    print("Found a test failure:\n")
-                    #print(fail)
                     textAlert(test_details, subtest, rank)
             else:
-                #subtest = leaderboard[i-1].replace(":", "")
                 fail = {'main':test_details, 'sub':subtest, 'rank':1}
                 remove_failure(fail, test_failures)
 
@@ -85,8 +77,6 @@ def textAlert(test, subtest, rank):
                             'Subject: 3600tcp Alert',
                             '', message])
         server.sendmail(gmail_info['username'], a, body)
-        #print "Sent from %s to %s with message:\n" % (gmail_info['username'], a)
-        #print message
     server.quit()
 
 # read in sensitive info from settings file
@@ -95,10 +85,7 @@ configp = ConfigParser.RawConfigParser()
 configp.read(config_file)
 gmail_info = ast.literal_eval(configp.get('leaderboard', 'gmailinfo'))
 phonenum_emails = configp.get('leaderboard', 'phonenumemails').split(',')
-#print gmail_info
-#print type(gmail_info)
-#print phonenum_emails
-#print type(phonenum_emails)
+
 # setup other useful things
 results = "current_results.txt"
 usernames = ["nvanben", "nat"]
