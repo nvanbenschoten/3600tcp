@@ -24,7 +24,7 @@
 
 static int DATA_SIZE = 1460;
 
-unsigned short sequence = 0;
+unsigned short p_created = 1;
 
 void usage() {
     printf("Usage: 3600send host:port\n");
@@ -64,7 +64,7 @@ void *get_next_packet(int sequence, int *len) {
     return packet;
 }
 
-int send_next_packet(int sock, struct sockaddr_in out) {
+/*int send_next_packet(int sock, struct sockaddr_in out) {
     int packet_len = 0;
     void *packet = get_next_packet(sequence, &packet_len);
 
@@ -79,17 +79,18 @@ int send_next_packet(int sock, struct sockaddr_in out) {
     }
 
     return 1;
-}
+}*/
 
-void send_final_packet(int sock, struct sockaddr_in out) {
+/*void send_final_packet(int sock, struct sockaddr_in out) {
     header *myheader = make_header(sequence+1, 0, 1, 0);
     mylog("[send eof]\n");
 
     if (sendto(sock, myheader, sizeof(header), 0, (struct sockaddr *) &out, (socklen_t) sizeof(out)) < 0) {
-        perror("sendto");
+        perror("sendto"nt received;
+        );
         exit(1);
     }
-}
+}*/
 
 int main(int argc, char *argv[]) {
     /**
@@ -138,7 +139,7 @@ int main(int argc, char *argv[]) {
 
     // packet tracking vars
     unsigned short p_ack = 0;
-    unsigned short p_created = 1;
+    //unsigned short p_created = 1;
     //int p_sent = 0;
     //void *packet;
     //int p_off = 0;
@@ -146,6 +147,8 @@ int main(int argc, char *argv[]) {
     int p_len[WINDOW_SIZE] = {0};
     int more_packets = 1;
     unsigned int i = 0;
+    //int repeated_acks = 0;
+    //int retransmitted = 0;
     //int done = 0;
 
     // allocate memory buffers for packets
@@ -182,6 +185,9 @@ int main(int argc, char *argv[]) {
                 exit(1);
             }
             mylog("[send data] %d (%d)\n", i, p_len[i%WINDOW_SIZE] - sizeof(header)); // 
+            //if (retransmitted) {
+            //    break;
+            //}
         }
         
         //int done = 0;
@@ -206,12 +212,28 @@ int main(int argc, char *argv[]) {
 
             header *myheader = get_header(buf);
 
+            /*if (retransmitted && myheader->sequence == p_ack) {
+                continue;
+            }*/
+
             if ((myheader->magic == MAGIC) && (myheader->sequence >= p_ack) && (myheader->ack == 1)) {
                 mylog("[recv ack] %d\n", myheader->sequence);
+                
+                /*if (p_ack == myheader->sequence) { // if we received a repeated ack
+                    repeated_acks++;
+                }
+                else {
+                    retransmitted = 0;
+                    repeated_acks = 0;
+                }
+                if (repeated_acks >= 3) { // if we need to fast retransmit
+                    retransmitted = 1;
+                    break;
+                }*/
                 p_ack = myheader->sequence;
-                //done = 1;
+                 //done = 1;
             } else {
-                mylog("[recv corrupted ack] %x %d\n", MAGIC, sequence);
+                mylog("[recv corrupted ack] %x %d\n", MAGIC, p_created);
             }
             //FD_ZERO(&socks);
             //FD_SET(sock, &socks);

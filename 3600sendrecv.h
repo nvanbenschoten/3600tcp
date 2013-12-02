@@ -11,9 +11,9 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#define WINDOW_SIZE 500
+#define WINDOW_SIZE 115
 #define SENDER_TIMEOUT_SEC 0
-#define SENDER_TIMEOUT_MICRO 500000
+#define SENDER_TIMEOUT_MICRO 100000
 
 typedef struct header_t {
   unsigned int magic:14;
