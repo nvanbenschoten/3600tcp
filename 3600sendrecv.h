@@ -11,9 +11,9 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#define WINDOW_SIZE 500
+#define WINDOW_SIZE 40
 #define SENDER_TIMEOUT_SEC 0
-#define SENDER_TIMEOUT_MICRO 500000
+#define SENDER_TIMEOUT_MICRO 65000
 
 typedef struct header_t {
   unsigned int magic:14;
@@ -21,10 +21,12 @@ typedef struct header_t {
   unsigned int eof:1;
   unsigned short length;
   unsigned short sequence;
+  unsigned short checksum;
 } header;
 
 unsigned int MAGIC;
 
+unsigned short get_checksum(unsigned short *buf);
 void dump_packet(unsigned char *data, int size);
 header *make_header(short sequence, int length, int eof, int ack);
 header *get_header(void *data);

@@ -102,12 +102,19 @@ int main() {
             }
 
             //      dump_packet(buf, received);
+            unsigned short expected_checksum = get_checksum((unsigned short *)buf); 
 
             header *myheader = get_header(buf);
             char *data = get_data(buf);
 
             if (myheader->magic == MAGIC) {
                 // Got a valid packet
+
+                if (expected_checksum != myheader->checksum) {
+                    // If expected checksum does not match found checksum
+                    mylog("[recv corrupted packet]\n");
+                    continue;
+                }
 
                 if ((int)myheader->sequence == current_packet) {
                     // Is the current packet

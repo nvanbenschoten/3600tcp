@@ -65,6 +65,7 @@ header *make_header(short sequence, int length, int eof, int ack) {
   myheader->sequence = htons(sequence);
   myheader->length = htons(length);
   myheader->ack = ack;
+  myheader->checksum = get_checksum((unsigned short*)myheader);
 
   return myheader;
 }
@@ -144,3 +145,21 @@ void dump_packet(unsigned char *data, int size) {
         printf("[%4.4s]   %-50.50s  %s\n", addrstr, hexstr, charstr);
     }
 }
+
+/**
+ * Returns expected checksum from header buffer
+ */
+unsigned short get_checksum(unsigned short *buf) {
+    int count = sizeof(header)/2 - 1;
+    register unsigned long sum = 0;
+    while (count--) {
+        sum += *buf++;
+        if (sum & 0xFFFF0000) {
+            /* carry occurred, so wrap around */
+            sum &= 0xFFFF;
+            sum++;
+        }
+    }
+    return ~(sum & 0xFFFF);
+}
+
