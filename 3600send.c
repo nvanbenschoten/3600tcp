@@ -42,7 +42,7 @@ int get_next_data(char *data, int size) {
  * Builds and returns the next packet, or NULL
  * if no more data is available.
  */
-void *get_next_packet(int sequence, int *len) {
+void *get_next_packet(int sequence, int *len, unsigned int time) {
     char *data = malloc(DATA_SIZE);
     int data_len = get_next_data(data, DATA_SIZE);
 
@@ -51,7 +51,7 @@ void *get_next_packet(int sequence, int *len) {
         return NULL;
     }
 
-    header *myheader = make_header((short)sequence, data_len, 0, 0);
+    header *myheader = make_header((short)sequence, data_len, 0, 0, time);
     void *packet = malloc(sizeof(header) + data_len);
     memcpy(packet, myheader, sizeof(header));
     memcpy(((char *) packet) +sizeof(header), data, data_len);
@@ -155,13 +155,29 @@ int main(int argc, char *argv[]) {
     for (i = 0; i < WINDOW_SIZE; i++) {
         packets[i] = calloc(1, 1500);
     }
+    
+    //time_t ltime;
+    //ltime = time(NULL);
+    //struct tm *tm;
+    //tm = localtime(&ltime);
+    struct timeval start_time;
+    gettimeofday(&start_time, NULL);
+    struct timeval cur_time;
+    gettimeofday(&cur_time, NULL);
+    unsigned int elapsed_time = 0;
+    unsigned int timeout_sec = SENDER_TIMEOUT_SEC;
+    unsigned int timeout_usec = SENDER_TIMEOUT_MICRO;
+    //int base_time = 
+
 
     while (1) {
     //while (send_next_packet(sock, out)) {
 
         // get the next packets to send if necessary in window
         while (more_packets && p_created-p_ack < WINDOW_SIZE) {
-            packets[p_created%WINDOW_SIZE] = get_next_packet(p_created, &(p_len[p_created%WINDOW_SIZE])); // 
+            gettimeofday(&cur_time, NULL);
+            elapsed_time = (unsigned int)(cur_time.tv_sec*1000000 + cur_time.tv_usec)-(start_time.tv_sec*100000+start_time.tv_usec);
+            packets[p_created%WINDOW_SIZE] = get_next_packet(p_created, &(p_len[p_created%WINDOW_SIZE]), elapsed_time); // 
             //memcpy(&(packets[p_created%10]), get_next_packet(p_created, &(p_len[p_created%10])), p_len[p_created%10]);
              
             if (packets[p_created%WINDOW_SIZE] == NULL) { 
@@ -196,8 +212,8 @@ int main(int argc, char *argv[]) {
         // check for received packets
         FD_ZERO(&socks);
         FD_SET(sock, &socks);
-        t.tv_sec = SENDER_TIMEOUT_SEC;
-        t.tv_usec = SENDER_TIMEOUT_MICRO;
+        t.tv_sec = timeout_sec * RTT_MULT;
+        t.tv_usec = timeout_usec * RTT_MULT;
 
         // wait to receive, or for a timeout
         // loop while still receiving packets/data every 10 ms
@@ -231,8 +247,20 @@ int main(int argc, char *argv[]) {
                     break;
                 }*/
                 p_ack = myheader->sequence;
+                //gettimeofday(&cur_time, NULL);
+
+                // update timeout values estimates based on RTT
+                elapsed_time = (unsigned int)(cur_time.tv_sec*1000000 + cur_time.tv_usec)-(start_time.tv_sec*100000+start_time.tv_usec);
+                timeout_sec = timeout_sec*RTT_DECAY + (1-RTT_DECAY)*(elapsed_time - myheader->time)/1000000;
+                timeout_usec =  timeout_usec*RTT_DECAY + (1-RTT_DECAY)*(elapsed_time - myheader->time)%1000000;
                  //done = 1;
             } else {
+                // update timeout values estimates based on RTT
+                // TODO: determine this helps or hurts estimate
+                elapsed_time = (unsigned int)(cur_time.tv_sec*1000000 + cur_time.tv_usec)-(start_time.tv_sec*100000+start_time.tv_usec);
+                timeout_sec = timeout_sec*RTT_DECAY + (1-RTT_DECAY)*(elapsed_time - myheader->time)/1000000;
+                timeout_usec =  timeout_usec*RTT_DECAY + (1-RTT_DECAY)*(elapsed_time - myheader->time)%1000000;
+                // log old ACK
                 mylog("[recv corrupted ack] %x %d\n", MAGIC, p_created);
             }
             //FD_ZERO(&socks);

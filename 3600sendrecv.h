@@ -14,6 +14,9 @@
 #define WINDOW_SIZE 115
 #define SENDER_TIMEOUT_SEC 0
 #define SENDER_TIMEOUT_MICRO 100000
+#define DUPLICATE_ACKS = 3 // # of duplicate ACKs to fast retransmit
+#define RTT_DECAY 0.8 // decay factor for old moving average values
+#define RTT_MULT 1.05 // multiplication factor for timeout error
 
 typedef struct header_t {
   unsigned int magic:14;
