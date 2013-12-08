@@ -8,10 +8,10 @@ $(SENDRECV).o: $(SENDRECV).c
 	gcc -c -std=c99 -O0 -g -lm -Wall -pedantic -Wextra -o $@ $<
 
 $(SEND): $(SEND).c $(SENDRECV).o
-	gcc -std=c99 -O0 -g -lm -Wall -pedantic -Wextra -o $@ $< $(SENDRECV).o
+	gcc -std=c99 -O0 -g -Wall -pedantic -Wextra -o $@ $< $(SENDRECV).o -lm
 
 $(RECV): $(RECV).c $(SENDRECV).o
-	gcc -std=c99 -O0 -g -lm -Wall -pedantic -Wextra -o $@ $< $(SENDRECV).o
+	gcc -std=c99 -O0 -g -Wall -pedantic -Wextra -o $@ $< $(SENDRECV).o -lm
 
 test: all
 	./test

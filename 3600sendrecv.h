@@ -11,10 +11,10 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#define WINDOW_SIZE 115
+#define WINDOW_SIZE 2000
 #define SENDER_TIMEOUT_SEC 0
 #define SENDER_TIMEOUT_MICRO 100000
-#define DUPLICATE_ACKS = 3 // # of duplicate ACKs to fast retransmit
+#define DUPLICATE_ACKS 3 // # of duplicate ACKs to fast retransmit
 #define RTT_DECAY 0.8 // decay factor for old moving average values
 #define RTT_MULT 1.05 // multiplication factor for timeout error
 
@@ -30,7 +30,7 @@ typedef struct header_t {
 unsigned int MAGIC;
 
 void dump_packet(unsigned char *data, int size);
-header *make_header(short sequence, int length, int eof, int ack);
+header *make_header(short sequence, int length, int eof, int ack, unsigned int time);
 header *get_header(void *data);
 char *get_data(void *data);
 char *timestamp();

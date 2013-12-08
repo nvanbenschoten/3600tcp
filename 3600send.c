@@ -26,6 +26,12 @@ static int DATA_SIZE = 1460;
 
 unsigned short p_created = 1;
 
+struct timeval start_time;
+struct timeval cur_time;
+unsigned int elapsed_time = 0;
+unsigned int timeout_sec = SENDER_TIMEOUT_SEC;
+unsigned int timeout_usec = SENDER_TIMEOUT_MICRO;
+
 void usage() {
     printf("Usage: 3600send host:port\n");
     exit(1);
@@ -62,6 +68,13 @@ void *get_next_packet(int sequence, int *len, unsigned int time) {
     *len = sizeof(header) + data_len;
 
     return packet;
+}
+
+void update_timeouts(unsigned int time) {
+    elapsed_time = (unsigned int)(cur_time.tv_sec*1000000 + cur_time.tv_usec)-(start_time.tv_sec*100000+start_time.tv_usec);
+    timeout_sec = timeout_sec*RTT_DECAY + (1-RTT_DECAY)*(elapsed_time-time)/1000000;
+    timeout_usec =  timeout_usec*RTT_DECAY + ((int)(1-RTT_DECAY)*(elapsed_time-time))%1000000;
+    
 }
 
 /*int send_next_packet(int sock, struct sockaddr_in out) {
@@ -147,9 +160,9 @@ int main(int argc, char *argv[]) {
     int p_len[WINDOW_SIZE] = {0};
     int more_packets = 1;
     unsigned int i = 0;
-    //int repeated_acks = 0;
-    //int retransmitted = 0;
-    //int done = 0;
+    int repeated_acks = 0;
+    int retransmitted = 0;
+    //
 
     // allocate memory buffers for packets
     for (i = 0; i < WINDOW_SIZE; i++) {
@@ -160,23 +173,26 @@ int main(int argc, char *argv[]) {
     //ltime = time(NULL);
     //struct tm *tm;
     //tm = localtime(&ltime);
-    struct timeval start_time;
     gettimeofday(&start_time, NULL);
-    struct timeval cur_time;
     gettimeofday(&cur_time, NULL);
-    unsigned int elapsed_time = 0;
-    unsigned int timeout_sec = SENDER_TIMEOUT_SEC;
-    unsigned int timeout_usec = SENDER_TIMEOUT_MICRO;
-    //int base_time = 
-
+    //`
+    int starting = 1;
+    int cur_window = 1;
+    float window_size_exp = 0;
+    int backoff = 1;
 
     while (1) {
-    //while (send_next_packet(sock, out)) {
+        if (starting) { // if we are still exponentially increasing the window size
+            cur_window = (int) pow(2.0, window_size_exp);
+            window_size_exp++;
+        }
 
         // get the next packets to send if necessary in window
-        while (more_packets && p_created-p_ack < WINDOW_SIZE) {
+        while (more_packets && p_created-p_ack < cur_window) {
+            // get a time for our new packet
             gettimeofday(&cur_time, NULL);
             elapsed_time = (unsigned int)(cur_time.tv_sec*1000000 + cur_time.tv_usec)-(start_time.tv_sec*100000+start_time.tv_usec);
+            // create the packet and add it to the array
             packets[p_created%WINDOW_SIZE] = get_next_packet(p_created, &(p_len[p_created%WINDOW_SIZE]), elapsed_time); // 
             //memcpy(&(packets[p_created%10]), get_next_packet(p_created, &(p_len[p_created%10])), p_len[p_created%10]);
              
@@ -201,14 +217,11 @@ int main(int argc, char *argv[]) {
                 exit(1);
             }
             mylog("[send data] %d (%d)\n", i, p_len[i%WINDOW_SIZE] - sizeof(header)); // 
-            //if (retransmitted) {
-            //    break;
-            //}
+            if (retransmitted) {
+                break;
+            }
         }
         
-        //int done = 0;
-
-        //while (! done) {
         // check for received packets
         FD_ZERO(&socks);
         FD_SET(sock, &socks);
@@ -228,38 +241,46 @@ int main(int argc, char *argv[]) {
 
             header *myheader = get_header(buf);
 
-            /*if (retransmitted && myheader->sequence == p_ack) {
+            if (retransmitted && myheader->sequence == p_ack) { // if we just retransmitted and are still dealing with a packet backlog
+                // update timeout
+                update_timeouts(myheader->time);
+                // go to process next parcket and ignore this one
                 continue;
-            }*/
+            }
 
             if ((myheader->magic == MAGIC) && (myheader->sequence >= p_ack) && (myheader->ack == 1)) {
                 mylog("[recv ack] %d\n", myheader->sequence);
-                
-                /*if (p_ack == myheader->sequence) { // if we received a repeated ack
+
+                if (p_ack == myheader->sequence) { // if we received a repeated ack
                     repeated_acks++;
                 }
-                else {
+                else { // otherwise reset the repeated_ack count and mark retransmission as unnecessary
+                    if (!starting) {
+                        cur_window++;
+                    }
                     retransmitted = 0;
                     repeated_acks = 0;
                 }
-                if (repeated_acks >= 3) { // if we need to fast retransmit
-                    retransmitted = 1;
-                    break;
-                }*/
-                p_ack = myheader->sequence;
-                //gettimeofday(&cur_time, NULL);
 
+                if (repeated_acks >= DUPLICATE_ACKS) { // if we need to fast retransmit
+                    //p_ack = myheader->sequence; // TODO: see if necessary
+                    retransmitted = 1;
+                    repeated_acks = 0;
+                    starting = 0;
+                    cur_window = cur_window*backoff/(backoff+1); // TODO: maybe need + 1
+                    backoff++;
+                    update_timeouts(myheader->time);
+                    break;
+                }
+
+                p_ack = myheader->sequence;
                 // update timeout values estimates based on RTT
-                elapsed_time = (unsigned int)(cur_time.tv_sec*1000000 + cur_time.tv_usec)-(start_time.tv_sec*100000+start_time.tv_usec);
-                timeout_sec = timeout_sec*RTT_DECAY + (1-RTT_DECAY)*(elapsed_time - myheader->time)/1000000;
-                timeout_usec =  timeout_usec*RTT_DECAY + (1-RTT_DECAY)*(elapsed_time - myheader->time)%1000000;
+                update_timeouts(myheader->time);
                  //done = 1;
             } else {
                 // update timeout values estimates based on RTT
                 // TODO: determine this helps or hurts estimate
-                elapsed_time = (unsigned int)(cur_time.tv_sec*1000000 + cur_time.tv_usec)-(start_time.tv_sec*100000+start_time.tv_usec);
-                timeout_sec = timeout_sec*RTT_DECAY + (1-RTT_DECAY)*(elapsed_time - myheader->time)/1000000;
-                timeout_usec =  timeout_usec*RTT_DECAY + (1-RTT_DECAY)*(elapsed_time - myheader->time)%1000000;
+                update_timeouts(myheader->time);
                 // log old ACK
                 mylog("[recv corrupted ack] %x %d\n", MAGIC, p_created);
             }
@@ -270,14 +291,14 @@ int main(int argc, char *argv[]) {
         }*/
         if (!more_packets && p_ack+1 == p_created) {
             //mylog("done, all packets acked\n");
-            //done = 1;
             break;
         }
     }
-    //}
 
     //send_final_packet(sock, out);
-    header *myheader = make_header(p_created, 0, 1, 0);
+    gettimeofday(&cur_time, NULL);
+    elapsed_time = (unsigned int)(cur_time.tv_sec*1000000 + cur_time.tv_usec)-(start_time.tv_sec*100000+start_time.tv_usec);
+    header *myheader = make_header(p_created, 0, 1, 0, elapsed_time);
     //mylog("[send eof]\n");
     mylog("[send eof]\n");
 
