@@ -102,7 +102,10 @@ int main() {
             }
 
             //      dump_packet(buf, received);
-            unsigned short expected_checksum = get_checksum((unsigned short *)buf); 
+
+            header *he = (header *) buf;
+            int dataLen = ntohs(he->length);
+            unsigned char expected_checksum = get_checksum((char *)buf, get_data(buf), dataLen); 
 
             header *myheader = get_header(buf);
             char *data = get_data(buf);
@@ -155,7 +158,7 @@ int main() {
                 mylog("[recv data] %d (%d) %s\n", (int)myheader->sequence, myheader->length, "ACCEPTED (in-order)");
                 mylog("[send ack] %d\n", current_packet-1);
 
-                header *responseheader = make_header((short)current_packet - 1, 0, myheader->eof, 1);
+                header *responseheader = make_header((short)current_packet - 1, 0, NULL, myheader->eof, 1);
                 if (sendto(sock, responseheader, sizeof(header), 0, (struct sockaddr *) &in, (socklen_t) sizeof(in)) < 0) {
                     perror("sendto");
                     free(buf);

@@ -51,7 +51,7 @@ void *get_next_packet(int sequence, int *len) {
         return NULL;
     }
 
-    header *myheader = make_header((short)sequence, data_len, 0, 0);
+    header *myheader = make_header((short)sequence, data_len, data, 0, 0);
     void *packet = malloc(sizeof(header) + data_len);
     memcpy(packet, myheader, sizeof(header));
     memcpy(((char *) packet) +sizeof(header), data, data_len);
@@ -82,7 +82,7 @@ int send_next_packet(int sock, struct sockaddr_in out) {
 }
 
 void send_final_packet(int sock, struct sockaddr_in out) {
-    header *myheader = make_header(sequence+1, 0, 1, 0);
+    header *myheader = make_header(sequence+1, 0, NULL, 1, 0);
     mylog("[send eof]\n");
 
     if (sendto(sock, myheader, sizeof(header), 0, (struct sockaddr *) &out, (socklen_t) sizeof(out)) < 0) {
@@ -227,7 +227,7 @@ int main(int argc, char *argv[]) {
     //}
 
     //send_final_packet(sock, out);
-    header *myheader = make_header(p_created, 0, 1, 0);
+    header *myheader = make_header(p_created, 0, NULL, 1, 0);
     //mylog("[send eof]\n");
     mylog("[send eof]\n");
 

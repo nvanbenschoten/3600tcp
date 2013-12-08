@@ -58,16 +58,16 @@ void mylog(char *fmt, ...) {
  * returns a brand new header.  The caller is responsible for
  * eventually free-ing the header.
  */
-header *make_header(short sequence, int length, int eof, int ack) {
+header *make_header(short sequence, int length, char *data, int eof, int ack) {
   header *myheader = (header *) malloc(sizeof(header));
   myheader->magic = MAGIC;
   myheader->eof = eof;
   myheader->sequence = htons(sequence);
   myheader->length = htons(length);
   myheader->ack = ack;
-  myheader->checksum = get_checksum((unsigned short*)myheader);
+  myheader->checksum = get_checksum((char *)myheader, data, length);
 
-  return myheader;
+return myheader;
 }
 
 /**
@@ -149,17 +149,25 @@ void dump_packet(unsigned char *data, int size) {
 /**
  * Returns expected checksum from header buffer
  */
-unsigned short get_checksum(unsigned short *buf) {
-    int count = sizeof(header)/2 - 1;
-    register unsigned long sum = 0;
+unsigned char get_checksum(char *buf, char *data, int length) {
+    int count = sizeof(header) - 2;
+    register unsigned short sum = 0;
     while (count--) {
         sum += *buf++;
-        if (sum & 0xFFFF0000) {
+        if (sum & 0xFF00) {
             /* carry occurred, so wrap around */
-            sum &= 0xFFFF;
+            sum &= 0xFF;
             sum++;
         }
     }
-    return ~(sum & 0xFFFF);
+    while(length--) {
+        sum += *data++;
+        if (sum & 0xFF00) {
+            /* carry occurred, so wrap around */
+            sum &= 0xFF;
+            sum++;
+        }
+    }
+    return ~(sum & 0xFF);
 }
 
