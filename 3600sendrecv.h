@@ -32,7 +32,7 @@ unsigned int MAGIC;
 
 unsigned char get_checksum(char *buf, char *data, int length);
 void dump_packet(unsigned char *data, int size);
-header *make_header(short sequence, int length, char *data, int eof, int ack, unsigned int time);
+header *make_header(short sequence, int length, int eof, int ack, unsigned int time);
 header *get_header(void *data);
 char *get_data(void *data);
 char *timestamp();

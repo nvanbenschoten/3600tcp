@@ -58,7 +58,7 @@ void mylog(char *fmt, ...) {
  * returns a brand new header.  The caller is responsible for
  * eventually free-ing the header.
  */
-header *make_header(short sequence, int length, char *data, int eof, int ack, unsigned int time) {
+header *make_header(short sequence, int length, int eof, int ack, unsigned int time) {
     header *myheader = (header *) malloc(sizeof(header));
     myheader->magic = MAGIC;
     myheader->eof = eof;
