@@ -26,7 +26,6 @@ typedef struct header_t {
   unsigned short length;
   unsigned short sequence;
   unsigned int time;
-  unsigned char checksum;
 } header;
 
 unsigned int MAGIC;

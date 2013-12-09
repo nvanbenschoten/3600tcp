@@ -103,8 +103,7 @@ int main() {
 
             //      dump_packet(buf, received);
 
-            header *he = (header *) buf;
-            int dataLen = ntohs(he->length);
+            int dataLen = ntohs(((header *) buf)->length);
             unsigned char expected_checksum = get_checksum((char *)buf, get_data(buf), dataLen); 
 
             header *myheader = get_header(buf);
@@ -113,9 +112,9 @@ int main() {
             if (myheader->magic == MAGIC) {
                 // Got a valid packet
 
-                if (expected_checksum != myheader->checksum) {
+                if (expected_checksum != *((unsigned char *)(data-1))) {
                     // If expected checksum does not match found checksum
-                    mylog("[recv corrupted packet]\n");
+                    mylog("[recv corrupted packet]   %i : %i\n", expected_checksum, *((unsigned char *)(data-1)));
                     continue;
                 }
 

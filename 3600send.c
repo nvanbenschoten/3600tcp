@@ -58,14 +58,20 @@ void *get_next_packet(int sequence, int *len, unsigned int time) {
     }
 
     header *myheader = make_header((short)sequence, data_len, data, 0, 0, time);
-    void *packet = malloc(sizeof(header) + data_len);
+    void *packet = malloc(sizeof(header) + sizeof(char) + data_len);
     memcpy(packet, myheader, sizeof(header));
-    memcpy(((char *) packet) +sizeof(header), data, data_len);
+    
+    unsigned char *checksum = malloc(sizeof(char));
+    *checksum = get_checksum((char *)myheader, data, data_len);
+    memcpy(((char *) packet) +sizeof(header), (char *)checksum, sizeof(unsigned char));
+   
+    memcpy(((char *) packet) +sizeof(header)+sizeof(char), data, data_len);
 
     free(data);
+    free(checksum);
     free(myheader);
 
-    *len = sizeof(header) + data_len;
+    *len = sizeof(header) + sizeof(char) + data_len;
 
     return packet;
 }
@@ -323,21 +329,31 @@ int main(int argc, char *argv[]) {
     gettimeofday(&cur_time, NULL);
     elapsed_time = (unsigned int)(cur_time.tv_sec*1000000 + cur_time.tv_usec)-(start_time.tv_sec*100000+start_time.tv_usec);
     header *myheader = make_header(p_created, 0, NULL, 1, 0, elapsed_time);
-    //mylog("[send eof]\n");
+
+    void *packet = malloc(sizeof(header) + sizeof(char));
+    memcpy(packet, myheader, sizeof(header));
+
+    unsigned char *checksum = malloc(sizeof(char));
+    *checksum = get_checksum((char *)myheader, NULL, 0);
+    memcpy(((char *) packet) +sizeof(header), (char *)checksum, sizeof(unsigned char));
+    
     mylog("[send eof]\n");
 
-    if (sendto(sock, myheader, sizeof(header), 0, (struct sockaddr *) &out, (socklen_t) sizeof(out)) < 0) {
+    if (sendto(sock, packet, sizeof(header)+1, 0, (struct sockaddr *) &out, (socklen_t) sizeof(out)) < 0) {
         perror("sendto");
         exit(1);
     }
-    if (sendto(sock, myheader, sizeof(header), 0, (struct sockaddr *) &out, (socklen_t) sizeof(out)) < 0) {
+    if (sendto(sock, packet, sizeof(header)+1, 0, (struct sockaddr *) &out, (socklen_t) sizeof(out)) < 0) {
         perror("sendto");
         exit(1);
     }
-    if (sendto(sock, myheader, sizeof(header), 0, (struct sockaddr *) &out, (socklen_t) sizeof(out)) < 0) {
+    if (sendto(sock, packet, sizeof(header)+1, 0, (struct sockaddr *) &out, (socklen_t) sizeof(out)) < 0) {
         perror("sendto");
         exit(1);
     }
+
+   free(packet);
+   free(checksum);
 
     mylog("[completed]\n");
 

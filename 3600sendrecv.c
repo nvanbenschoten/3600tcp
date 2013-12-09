@@ -66,7 +66,6 @@ header *make_header(short sequence, int length, char *data, int eof, int ack, un
     myheader->length = htons(length);
     myheader->ack = ack;
     myheader->time = htonl(time); // elapsed time since start of send in micro seconds
-    myheader->checksum = get_checksum((char *)myheader, data, length);
 
     return myheader;
 }
@@ -88,7 +87,7 @@ header *get_header(void *data) {
  * does not allocate any new memory, so no free is needed.
  */
 char *get_data(void *data) {
-  return (char *) data + sizeof(header);
+  return (char *) data + sizeof(header) + sizeof(char);
 }
 
 /**
@@ -151,7 +150,7 @@ void dump_packet(unsigned char *data, int size) {
  * Returns expected checksum from header buffer
  */
 unsigned char get_checksum(char *buf, char *data, int length) {
-    int count = sizeof(header) - 2;
+    int count = sizeof(header);
     register unsigned short sum = 0;
     while (count--) {
         sum += *buf++;
