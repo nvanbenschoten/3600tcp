@@ -24,7 +24,13 @@
 
 static int DATA_SIZE = 1460;
 
-unsigned short sequence = 0;
+unsigned short p_created = 1;
+
+struct timeval start_time;
+struct timeval cur_time;
+unsigned int elapsed_time = 0;
+unsigned int timeout_sec = SENDER_TIMEOUT_SEC;
+unsigned int timeout_usec = SENDER_TIMEOUT_MICRO;
 
 void usage() {
     printf("Usage: 3600send host:port\n");
@@ -42,7 +48,7 @@ int get_next_data(char *data, int size) {
  * Builds and returns the next packet, or NULL
  * if no more data is available.
  */
-void *get_next_packet(int sequence, int *len) {
+void *get_next_packet(int sequence, int *len, unsigned int time) {
     char *data = malloc(DATA_SIZE);
     int data_len = get_next_data(data, DATA_SIZE);
 
@@ -51,7 +57,7 @@ void *get_next_packet(int sequence, int *len) {
         return NULL;
     }
 
-    header *myheader = make_header((short)sequence, data_len, data, 0, 0);
+    header *myheader = make_header((short)sequence, data_len, data, 0, 0, time);
     void *packet = malloc(sizeof(header) + data_len);
     memcpy(packet, myheader, sizeof(header));
     memcpy(((char *) packet) +sizeof(header), data, data_len);
@@ -64,7 +70,18 @@ void *get_next_packet(int sequence, int *len) {
     return packet;
 }
 
-int send_next_packet(int sock, struct sockaddr_in out) {
+void update_timeouts(unsigned int time) {
+    time = ntohl(time);
+    gettimeofday(&cur_time, NULL);
+    elapsed_time = (unsigned int)(cur_time.tv_sec*1000000 + cur_time.tv_usec)-(start_time.tv_sec*100000+start_time.tv_usec);
+    unsigned int rtt = elapsed_time - time;
+    timeout_sec = timeout_sec*RTT_DECAY + (1-RTT_DECAY)*(rtt)/1000000;
+    timeout_usec =  timeout_usec*RTT_DECAY + ((unsigned int)((1.0-RTT_DECAY)*(rtt)))%1000000;
+    mylog("time: %u elapsed_time: %u timeout_sec: %u timeout_usec: %u rtt: %u\n", time, elapsed_time, timeout_sec, timeout_usec, rtt);
+    //mylog("Set timeout_usec to %u\n", timeout_usec);
+}
+
+/*int send_next_packet(int sock, struct sockaddr_in out) {
     int packet_len = 0;
     void *packet = get_next_packet(sequence, &packet_len);
 
@@ -79,30 +96,20 @@ int send_next_packet(int sock, struct sockaddr_in out) {
     }
 
     return 1;
-}
+}*/
 
-void send_final_packet(int sock, struct sockaddr_in out) {
-    header *myheader = make_header(sequence+1, 0, NULL, 1, 0);
+/*void send_final_packet(int sock, struct sockaddr_in out) {
+    header *myheader = make_header(sequence+1, 0, 1, 0);
     mylog("[send eof]\n");
 
     if (sendto(sock, myheader, sizeof(header), 0, (struct sockaddr *) &out, (socklen_t) sizeof(out)) < 0) {
-        perror("sendto");
+        perror("sendto"nt received;
+        );
         exit(1);
     }
-}
+}*/
 
 int main(int argc, char *argv[]) {
-    /**
-     * I've included some basic code for opening a UDP socket in C, 
-     * binding to a empheral port, printing out the port number.
-     * 
-     * I've also included a very simple transport protocol that simply
-     * acknowledges every received packet.  It has a header, but does
-     * not do any error handling (i.e., it does not have sequence 
-     * numbers, timeouts, retries, a "window"). You will
-     * need to fill in many of the details, but this should be enough to
-     * get you started.
-     */
 
     // extract the host IP and port
     if ((argc != 2) || (strstr(argv[1], ":") == NULL)) {
@@ -138,27 +145,51 @@ int main(int argc, char *argv[]) {
 
     // packet tracking vars
     unsigned short p_ack = 0;
-    unsigned short p_created = 1;
+    //unsigned short p_created = 1;
     //int p_sent = 0;
     //void *packet;
     //int p_off = 0;
     void * packets[WINDOW_SIZE] = {0};
     int p_len[WINDOW_SIZE] = {0};
     int more_packets = 1;
-    unsigned int i = 0;
-    //int done = 0;
+    int i = 0;
+    int repeated_acks = 0;
+    int retransmitted = 0;
+    //
 
     // allocate memory buffers for packets
     for (i = 0; i < WINDOW_SIZE; i++) {
         packets[i] = calloc(1, 1500);
     }
+    
+    //time_t ltime;
+    //ltime = time(NULL);
+    //struct tm *tm;
+    //tm = localtime(&ltime);
+    gettimeofday(&start_time, NULL);
+    gettimeofday(&cur_time, NULL);
+    mylog("start_time.tv_sec: %d cur_time.tv_sec: %d\n", start_time.tv_sec, cur_time.tv_sec);
+    //`
+    int starting = 1;
+    int cur_window = 1;
+    float window_size_exp = 0;
+    int backoff = 1;
+    int round_acked = 0;
 
     while (1) {
-    //while (send_next_packet(sock, out)) {
+        /*if (starting) { // if we are still exponentially increasing the window size
+            cur_window = (int) pow(2.0, window_size_exp);
+            mylog("Increased cur_window to %d\n", cur_window);
+            window_size_exp++;
+        }*/
 
         // get the next packets to send if necessary in window
-        while (more_packets && p_created-p_ack < WINDOW_SIZE) {
-            packets[p_created%WINDOW_SIZE] = get_next_packet(p_created, &(p_len[p_created%WINDOW_SIZE])); // 
+        while (more_packets && p_created-p_ack <= cur_window) {
+            // get a time for our new packet
+            gettimeofday(&cur_time, NULL);
+            elapsed_time = (unsigned int)(cur_time.tv_sec*1000000 + cur_time.tv_usec)-(start_time.tv_sec*100000+start_time.tv_usec);
+            // create the packet and add it to the array
+            packets[p_created%WINDOW_SIZE] = get_next_packet(p_created, &(p_len[p_created%WINDOW_SIZE]), elapsed_time); // 
             //memcpy(&(packets[p_created%10]), get_next_packet(p_created, &(p_len[p_created%10])), p_len[p_created%10]);
              
             if (packets[p_created%WINDOW_SIZE] == NULL) { 
@@ -176,22 +207,24 @@ int main(int argc, char *argv[]) {
         }
 
         // send non-acked packets in window
-        for (i = p_ack+1; i < p_created; i++) {
+        for (i = p_ack+1; i < p_created && i <= p_ack+cur_window; i++) {
+            mylog("i: %d p_created: %d cur_window: %d\n", i, p_created, cur_window);
             if (sendto(sock, packets[i%WINDOW_SIZE], p_len[i%WINDOW_SIZE], 0, (struct sockaddr *) &out, (socklen_t) sizeof(out)) < 0) {
                 perror("sendto");
                 exit(1);
             }
             mylog("[send data] %d (%d)\n", i, p_len[i%WINDOW_SIZE] - sizeof(header)); // 
+            if (retransmitted) {
+                break;
+            }
         }
         
-        //int done = 0;
-
-        //while (! done) {
+        
         // check for received packets
         FD_ZERO(&socks);
         FD_SET(sock, &socks);
-        t.tv_sec = SENDER_TIMEOUT_SEC;
-        t.tv_usec = SENDER_TIMEOUT_MICRO;
+        t.tv_sec = timeout_sec * RTT_MULT;
+        t.tv_usec = timeout_usec * RTT_MULT;
 
         // wait to receive, or for a timeout
         // loop while still receiving packets/data every 10 ms
@@ -206,31 +239,101 @@ int main(int argc, char *argv[]) {
 
             header *myheader = get_header(buf);
 
+            if (retransmitted && myheader->sequence == p_ack) { // if we just retransmitted and are still dealing with a packet backlog
+                // update timeout
+                update_timeouts(myheader->time);
+                // go to process next parcket and ignore this one
+                continue;
+            }
+
             if ((myheader->magic == MAGIC) && (myheader->sequence >= p_ack) && (myheader->ack == 1)) {
                 mylog("[recv ack] %d\n", myheader->sequence);
+
+                if (p_ack == myheader->sequence) { // if we received a repeated ack
+                    repeated_acks++;
+                }
+                else { // otherwise reset the repeated_ack count and mark retransmission as unnecessary
+                    if (starting) {
+                        cur_window++;
+                        mylog("Increased cur_window to %d\n", cur_window);
+                        //round_acked++;
+                    }
+                    else {
+                        round_acked++;
+                    }
+                    retransmitted = 0;
+                    repeated_acks = 0;
+                }
+
+                if (repeated_acks >= DUPLICATE_ACKS) { // if we need to fast retransmit
+                    //p_ack = myheader->sequence; // TODO: see if necessary
+                    retransmitted = 1;
+                    repeated_acks = 0;
+                    starting = 0;
+                    if (cur_window != 1) {
+                        cur_window = cur_window*backoff/(backoff+1); // TODO: maybe need + 1
+                    }
+                    backoff++;
+                    update_timeouts(myheader->time);
+                    break;
+                }
+
                 p_ack = myheader->sequence;
+                // update timeout values estimates based on RTT
+                update_timeouts(myheader->time);
+                if (p_ack+1 == p_created) {
+                    break;
+                }
                 //done = 1;
             } else {
-                mylog("[recv corrupted ack] %x %d\n", MAGIC, sequence);
+                // update timeout values estimates based on RTT
+                // TODO: determine this helps or hurts estimate
+                update_timeouts(myheader->time);
+                // log old ACK
+                mylog("[recv corrupted ack] %x %d\n", MAGIC, p_created);
             }
+
             //FD_ZERO(&socks);
             //FD_SET(sock, &socks);
         } /*else {
             mylog("[error] timeout occurred\n");
         }*/
+        // increase window for congestion avoidence if necessary
+        cur_window += (int) (CWD_SCALE_FACTOR*(float)round_acked/(float)cur_window);
+        round_acked = 0;
+
+        if (t.tv_sec <= 0 && t.tv_usec <= 0) { // if we timed out waiting for packets
+            starting = 0;
+            if (cur_window != 1) {
+                cur_window = cur_window*backoff/(backoff+1);
+                mylog("timeout: backing off, backoff = %d cur_window = %d\n", backoff, cur_window);
+            }
+            //backoff++;
+        } //else { // otherwise we completed a round successfully so we incread window slightly
+            
+        //}
+
         if (!more_packets && p_ack+1 == p_created) {
             //mylog("done, all packets acked\n");
-            //done = 1;
             break;
         }
     }
-    //}
 
     //send_final_packet(sock, out);
-    header *myheader = make_header(p_created, 0, NULL, 1, 0);
+    gettimeofday(&cur_time, NULL);
+    elapsed_time = (unsigned int)(cur_time.tv_sec*1000000 + cur_time.tv_usec)-(start_time.tv_sec*100000+start_time.tv_usec);
+    header *myheader = make_header(p_created, 0, NULL, 1, 0, elapsed_time);
     //mylog("[send eof]\n");
     mylog("[send eof]\n");
 
+    if (sendto(sock, myheader, sizeof(header), 0, (struct sockaddr *) &out, (socklen_t) sizeof(out)) < 0) {
+        perror("sendto");
+        exit(1);
+    }
+    if (sendto(sock, myheader, sizeof(header), 0, (struct sockaddr *) &out, (socklen_t) sizeof(out)) < 0) {
+        perror("sendto");
+        exit(1);
+    }
     if (sendto(sock, myheader, sizeof(header), 0, (struct sockaddr *) &out, (socklen_t) sizeof(out)) < 0) {
         perror("sendto");
         exit(1);

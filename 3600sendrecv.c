@@ -58,16 +58,17 @@ void mylog(char *fmt, ...) {
  * returns a brand new header.  The caller is responsible for
  * eventually free-ing the header.
  */
-header *make_header(short sequence, int length, char *data, int eof, int ack) {
-  header *myheader = (header *) malloc(sizeof(header));
-  myheader->magic = MAGIC;
-  myheader->eof = eof;
-  myheader->sequence = htons(sequence);
-  myheader->length = htons(length);
-  myheader->ack = ack;
-  myheader->checksum = get_checksum((char *)myheader, data, length);
+header *make_header(short sequence, int length, char *data, int eof, int ack, unsigned int time) {
+    header *myheader = (header *) malloc(sizeof(header));
+    myheader->magic = MAGIC;
+    myheader->eof = eof;
+    myheader->sequence = htons(sequence);
+    myheader->length = htons(length);
+    myheader->ack = ack;
+    myheader->time = htonl(time); // elapsed time since start of send in micro seconds
+    myheader->checksum = get_checksum((char *)myheader, data, length);
 
-return myheader;
+    return myheader;
 }
 
 /**
