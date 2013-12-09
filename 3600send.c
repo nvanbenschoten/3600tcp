@@ -178,7 +178,7 @@ int main(int argc, char *argv[]) {
     //`
     int starting = 1;
     int cur_window = 1;
-    float window_size_exp = 0;
+    //float window_size_exp = 0;
     int backoff = 1;
     int round_acked = 0;
 
@@ -277,7 +277,7 @@ int main(int argc, char *argv[]) {
                     repeated_acks = 0;
                     starting = 0;
                     if (cur_window != 1) {
-                        cur_window = cur_window*backoff/(backoff+1); // TODO: maybe need + 1
+                        //cur_window = cur_window*backoff/(backoff+1); // TODO: maybe need + 1
                     }
                     backoff++;
                     update_timeouts(myheader->time);
@@ -312,8 +312,13 @@ int main(int argc, char *argv[]) {
             starting = 0;
             if (cur_window != 1) {
                 cur_window = cur_window*backoff/(backoff+1);
-                mylog("timeout: backing off, backoff = %d cur_window = %d\n", backoff, cur_window);
             }
+            //timeout_usec = timeout_usec*2;
+            //timeout_sec =  (1-RTT_DECAY)*(rtt)/1000000;
+            //timeout_usec =  ((unsigned int)((1.0-RTT_DECAY)*(rtt)))%1000000;
+            timeout_sec = (timeout_usec*2)/1000000;
+            timeout_usec = (timeout_usec*2)%1000000;
+            mylog("timeout: backing off, backoff = %d cur_window = %d\n", backoff, cur_window);
             //backoff++;
         } //else { // otherwise we completed a round successfully so we incread window slightly
             
