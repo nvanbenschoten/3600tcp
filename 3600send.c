@@ -76,6 +76,11 @@ void *get_next_packet(int sequence, int *len, unsigned int time) {
     return packet;
 }
 
+
+/**
+ * Builds and returns the final EOF packet.
+ */
+
 void *get_final_packet() {
     gettimeofday(&cur_time, NULL);
     elapsed_time = (unsigned int)(cur_time.tv_sec*1000000 + cur_time.tv_usec)-(start_time.tv_sec*100000+start_time.tv_usec);
@@ -94,6 +99,11 @@ void *get_final_packet() {
     return packet;
 }
 
+/**
+ * Updates the timeout values for sent packets based on the RTT of a data send + ACK.
+ * Keeps a moving average to variable adjust timeout.
+ */
+
 void update_timeouts(unsigned int time) {
     time = ntohl(time);
     gettimeofday(&cur_time, NULL);
@@ -105,36 +115,7 @@ void update_timeouts(unsigned int time) {
     //mylog("Set timeout_usec to %u\n", timeout_usec);
 }
 
-/*int send_next_packet(int sock, struct sockaddr_in out) {
-    int packet_len = 0;
-    void *packet = get_next_packet(sequence, &packet_len);
-
-    if (packet == NULL) 
-        return 0;
-
-    mylog("[send data] %d (%d)\n", sequence, packet_len - sizeof(header));
-
-    if (sendto(sock, packet, packet_len, 0, (struct sockaddr *) &out, (socklen_t) sizeof(out)) < 0) {
-        perror("sendto");
-        exit(1);
-    }
-
-    return 1;
-}*/
-
-/*void send_final_packet(int sock, struct sockaddr_in out) {
-    header *myheader = make_header(sequence+1, 0, 1, 0);
-    mylog("[send eof]\n");
-
-    if (sendto(sock, myheader, sizeof(header), 0, (struct sockaddr *) &out, (socklen_t) sizeof(out)) < 0) {
-        perror("sendto"nt received;
-        );
-        exit(1);
-    }
-}*/
-
 int main(int argc, char *argv[]) {
-
     // extract the host IP and port
     if ((argc != 2) || (strstr(argv[1], ":") == NULL)) {
         usage();
@@ -168,77 +149,55 @@ int main(int argc, char *argv[]) {
     t.tv_usec = SENDER_TIMEOUT_MICRO; // 10 ms
 
     // packet tracking vars
-    unsigned short p_ack = 0;
-    //unsigned short p_created = 1;
-    //int p_sent = 0;
-    //void *packet;
-    //int p_off = 0;
-    void * packets[WINDOW_SIZE] = {0};
-    int p_len[WINDOW_SIZE] = {0};
-    int more_packets = 1;
-    int i = 0;
-    int repeated_acks = 0;
-    int retransmitted = 0;
-    //
+    unsigned short p_ack = 0; // acknowledged packets
+    void * packets[WINDOW_SIZE] = {0}; // array of pointers to packets for sending
+    int p_len[WINDOW_SIZE] = {0}; // 
+    int more_packets = 1; // whether there is more data to create packets for
+    int i = 0; // counting variable
+    int repeated_acks = 0; // # of repeated ACKs received in current round
+    int retransmitted = 0; // whether we are or just have fast retransmit
+    int starting = 1; // if we are in the starting phase scaling the window more aggressively
+    int cur_window = 2000; // the starting window size to use
+    int backoff = 1; // scaling factor for decreasing the window on a timeout
+    int round_acked = 0; // the number of ACKs received in the current round
 
     // allocate memory buffers for packets
     for (i = 0; i < WINDOW_SIZE; i++) {
         packets[i] = calloc(1, 1500);
     }
     
-    //time_t ltime;
-    //ltime = time(NULL);
-    //struct tm *tm;
-    //tm = localtime(&ltime);
+    // get the starting and current time to track time since program has starting in us
     gettimeofday(&start_time, NULL);
     gettimeofday(&cur_time, NULL);
-    mylog("start_time.tv_sec: %d cur_time.tv_sec: %d\n", start_time.tv_sec, cur_time.tv_sec);
-    //`
-    int starting = 1;
-    int cur_window = 2000;
-    //float window_size_exp = 0;
-    int backoff = 1;
-    int round_acked = 0;
 
     while (1) {
-        /*if (starting) { // if we are still exponentially increasing the window size
-            cur_window = (int) pow(2.0, window_size_exp);
-            mylog("Increased cur_window to %d\n", cur_window);
-            window_size_exp++;
-        }*/
-
         // get the next packets to send if necessary in window
         while (more_packets && p_created-p_ack <= cur_window) {
-            // get a time for our new packet
+            // get a send time for our new packet
             gettimeofday(&cur_time, NULL);
             elapsed_time = (unsigned int)(cur_time.tv_sec*1000000 + cur_time.tv_usec)-(start_time.tv_sec*100000+start_time.tv_usec);
             // create the packet and add it to the array
             packets[p_created%WINDOW_SIZE] = get_next_packet(p_created, &(p_len[p_created%WINDOW_SIZE]), elapsed_time); // 
-            //memcpy(&(packets[p_created%10]), get_next_packet(p_created, &(p_len[p_created%10])), p_len[p_created%10]);
              
-            if (packets[p_created%WINDOW_SIZE] == NULL) { 
-                //mylog("no more data that needs packets\n");
-                //p_created--;
+            if (packets[p_created%WINDOW_SIZE] == NULL) { // if no more data needs packets
                 more_packets = 0;
             }
-            //else {
-                //p_off++;
-            //}
-            else {
+            else { // otherwise increase our packet created count
                 p_created++;
-                //mylog("p_created: %d\n", p_created);
             }
         }
 
         // send non-acked packets in window
         for (i = p_ack+1; i < p_created && i <= p_ack+cur_window; i++) {
-            mylog("i: %d p_created: %d cur_window: %d\n", i, p_created, cur_window);
-            if (sendto(sock, packets[i%WINDOW_SIZE], p_len[i%WINDOW_SIZE], 0, (struct sockaddr *) &out, (socklen_t) sizeof(out)) < 0) {
+            // for all of the packets we created in the current window
+            if (sendto(sock, packets[i%WINDOW_SIZE], p_len[i%WINDOW_SIZE], 0, (struct sockaddr *) &out, (socklen_t) sizeof(out)) < 0) { // send them and ensure that there were no probs.
                 perror("sendto");
                 exit(1);
             }
-            mylog("[send data] %d (%d)\n", i, p_len[i%WINDOW_SIZE] - sizeof(header)); // 
-            if (retransmitted) {
+            // log sent data
+            mylog("[send data] %d (%d)\n", i, p_len[i%WINDOW_SIZE] - sizeof(header));
+            if (retransmitted) { // if we were fast retransmitting
+                // send it twice in case of another drop
                 if (sendto(sock, packets[i%WINDOW_SIZE], p_len[i%WINDOW_SIZE], 0, (struct sockaddr *) &out, (socklen_t) sizeof(out)) < 0) {
                     perror("sendto");
                     exit(1);
@@ -247,19 +206,18 @@ int main(int argc, char *argv[]) {
                     perror("sendto");
                     exit(1);
                 }
-                break;
+                break; // break because we don't need to send the rest
             }
         }
         
-        
-        // check for received packets
+        // set sockets and timeouts for receiving ACKs
         FD_ZERO(&socks);
         FD_SET(sock, &socks);
         t.tv_sec = timeout_sec * RTT_MULT;
         t.tv_usec = timeout_usec * RTT_MULT;
 
         // wait to receive, or for a timeout
-        // loop while still receiving packets/data every 10 ms
+        // loop while still receiving packets within timeout
         while (select(sock + 1, &socks, NULL, NULL, &t)) {
             unsigned char buf[10000];
             int buf_len = sizeof(buf);
@@ -269,99 +227,83 @@ int main(int argc, char *argv[]) {
                 exit(1);
             }
             
+            // get the checksum and header from the received packet
             unsigned char expected_checksum = get_checksum((char *)buf, NULL, 0); 
-
             header *myheader = get_header(buf);
 
-            if (retransmitted && myheader->sequence == p_ack) { // if we just retransmitted and are still dealing with a packet backlog
-                // update timeout
-                update_timeouts(myheader->time);
-                // go to process next parcket and ignore this one
-                continue;
+            if (retransmitted && myheader->sequence == p_ack) { // if we just retransmitted and are still dealing with a packet backlog of ACKs
+                update_timeouts(myheader->time); // update timeouts
+                continue; // go to process next packet and ignore this one
             }
 
             if ((myheader->magic == MAGIC) && expected_checksum == *((unsigned char *)(buf + sizeof(header))) && (myheader->sequence >= p_ack) && (myheader->ack == 1)) {
-                mylog("[recv ack] %d\n", myheader->sequence);
+                // if the packet is for us, the checksum is good meaning the data wasn't corrupted
+                // the sequence number is what we expect, and the packet is an acknowledgement
+                mylog("[recv ack] %d\n", myheader->sequence); // log the receive
 
                 if (p_ack == myheader->sequence) { // if we received a repeated ack
-                    repeated_acks++;
+                    repeated_acks++; // count it
                 }
-                else { // otherwise reset the repeated_ack count and mark retransmission as unnecessary
-                    if (starting) {
-                        cur_window++;
-                        mylog("Increased cur_window to %d\n", cur_window);
-                        //round_acked++;
+                else { // otherwise the ack is good
+                    if (starting) { // if we are rapidly increasing the window size
+                        cur_window++; // increased window size by 1 for every ACK
                     }
                     else {
+                        // otherwise count the number of acked packets for small window changes
+                        // in congestion avoidance phase
                         round_acked++;
                     }
-                    retransmitted = 0;
-                    repeated_acks = 0;
+                    retransmitted = 0; // reset potential for a fast_retransmit
+                    repeated_acks = 0; // reset repeated ack count
                 }
 
                 if (repeated_acks >= DUPLICATE_ACKS) { // if we need to fast retransmit
-                    //p_ack = myheader->sequence; // TODO: see if necessary
-                    retransmitted = 1;
-                    repeated_acks = 0;
-                    starting = 0;
-                    if (cur_window != 1) {
-                        //cur_window = cur_window*backoff/(backoff+1); // TODO: maybe need + 1
-                    }
-                    backoff++;
-                    update_timeouts(myheader->time);
-                    break;
+                    retransmitted = 1; // set retransmission
+                    repeated_acks = 0; // reset repeated_acks count
+                    starting = 0; // exit the starting phase if necessary
+                    backoff++; // change our scaling for timeouts
+                    update_timeouts(myheader->time); // update timeouts accordingly
+                    break; // exit for fast retransmit
                 }
 
-                p_ack = myheader->sequence;
-                // update timeout values estimates based on RTT
-                update_timeouts(myheader->time);
-                if (p_ack+1 == p_created) {
-                    break;
+                p_ack = myheader->sequence; // set new sequence #
+                update_timeouts(myheader->time); // update timeout values estimates based on RTT
+                if (p_ack+1 == p_created) { // if we got back all the packets we created
+                    break; // we don't need to wait for the timeout so break
                 }
-                //done = 1;
-            } else {
-                // update timeout values estimates based on RTT
-                // TODO: determine this helps or hurts estimate
-                update_timeouts(myheader->time);
-                // log old ACK
+            } else { // ACK was bad in some way
+                // log problematic ACK and ignore it
                 mylog("[recv corrupted ack] %x %d\n", MAGIC, p_created);
             }
 
-            //FD_ZERO(&socks);
-            //FD_SET(sock, &socks);
-        } /*else {
-            mylog("[error] timeout occurred\n");
-        }*/
-        // increase window for congestion avoidence if necessary
+        } 
+        // increase window for congestion avoidance if necessary
+        // increase the window by a small amount if not rapidly increasing during start
+        // after starting round_acked counts acks during a round so this actually does something
         cur_window += (int) (CWD_SCALE_FACTOR*(float)round_acked/(float)cur_window);
         round_acked = 0;
 
         if (t.tv_sec <= 0 && t.tv_usec <= 0) { // if we timed out waiting for packets
-            starting = 0;
-            if (cur_window != 1) {
-                cur_window = cur_window*backoff/(backoff+1);
+            starting = 0; // we are no longer rapidly increasing winodw
+            if (cur_window != 1) { // if we need to decrease the window
+                cur_window = cur_window*backoff/(backoff+1); // decrease it accordingly
             }
-            //timeout_usec = timeout_usec*2;
-            //timeout_sec =  (1-RTT_DECAY)*(rtt)/1000000;
-            //timeout_usec =  ((unsigned int)((1.0-RTT_DECAY)*(rtt)))%1000000;
+            // double timeouts to avoid future problems
             timeout_sec = (timeout_usec*2)/1000000;
             timeout_usec = (timeout_usec*2)%1000000;
-            mylog("timeout: backing off, backoff = %d cur_window = %d\n", backoff, cur_window);
-            //backoff++;
-        } //else { // otherwise we completed a round successfully so we incread window slightly
-            
-        //}
+        } 
 
-        if (!more_packets && p_ack+1 == p_created) {
-            //mylog("done, all packets acked\n");
-            break;
+        if (!more_packets && p_ack+1 == p_created) { 
+            // if there are no more packets we are waiting for
+            break; // break to send final EOF packet
         }
     }
 
-    //send_final_packet(sock, out);
+    // create the final packet
     char *packet = get_final_packet();
     mylog("[send eof]\n");
 
+    // send it 3 times to deal with potential drops/issues
     if (sendto(sock, packet, sizeof(header)+sizeof(char), 0, (struct sockaddr *) &out, (socklen_t) sizeof(out)) < 0) {
         perror("sendto");
         exit(1);
@@ -375,7 +317,11 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
+    // free, log completion, and return
     free(packet);
+    for (i = 0; i < WINDOW_SIZE; i++) { // free buffers for sent packets
+        free(packets[i]);
+    }
     mylog("[completed]\n");
     return 0;
 }
