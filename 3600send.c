@@ -1,10 +1,3 @@
-/*
- * CS3600, Spring 2013
- * Project 4 Starter Code
- * (c) 2013 Alan Mislove
- *
- */
-
 #include <math.h>
 #include <ctype.h>
 #include <time.h>
@@ -24,13 +17,13 @@
 
 static int DATA_SIZE = 1460;
 
-unsigned short p_created = 1;
+unsigned short p_created = 1; // number of packets created + 1
 
-struct timeval start_time;
-struct timeval cur_time;
+struct timeval start_time; // program start time
+struct timeval cur_time; // current time
 unsigned int elapsed_time = 0;
-unsigned int timeout_sec = SENDER_TIMEOUT_SEC;
-unsigned int timeout_usec = SENDER_TIMEOUT_MICRO;
+unsigned int timeout_sec = SENDER_TIMEOUT_SEC; // seconds portion of timeout
+unsigned int timeout_usec = SENDER_TIMEOUT_MICRO; // microseconds portion of timeout
 
 void usage() {
     printf("Usage: 3600send host:port\n");
