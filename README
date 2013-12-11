@@ -19,26 +19,33 @@ To approach this project, we broke the problem into parts: a sender who creates 
 
 For the sender we have a loop that runs until we have sent and acknowledged all of our data. This loop consists of three phases, creating packets to send, sending packets, and receiving acknowledgements. We first create packets until we fill up our window or run out of data to send. Next we send all of the packets as necessary, either sending all of the available packets in the window, or just sending one in the event of a fast retransmit. Finally we wait for received acknowledgements and process those, making adjustments to our window, timeout, and phase as necessary. We also do things like fast retransmit in response to these ACKs, which are discussed in greated detail below. In the event of a timeout we further adjust our window size and timeout. After receiving all of the ACKS for the data packets, we send the final EOF packet, which indicates that no more data will be sent, 3 times to easily ensure that it is not dropped/lost.
 
-For the receiver, 
+For the receiver, we tried to make the module as simple as possible. This meant that the receiver 
+simply read in packets from the network, cached them in a window, and responded with acknowledgments accordingly. If the incoming packet has the next sequence number that hte receiver was looing for, it responds with an acknowlegment of the sequence number and delivers the data to the output. If the sequence number is below, it responds with an ack but does nothing with the data because it was already handled. If the sequence number is above, it caches the data and continues to send the sequence number of the last contiguous data packet it got in its ACKs. When the reciever recieves an EOF packet, it closes.
 
 - Helper functions 
 
 -- Generic (3600sendrecv.c)
 
 get_checksum
-Takes in a header, a pakcets data, and the length of the header, and returns the checksum that the packet should have. This is used to both create the checksum beofre sending a pakcet and validate a packet after it has been received. The checksum works by taking the 1's compliment of the header and the data (but not the checksum) and 
+Takes in a header, a pakcets data, and the length of the header, and returns the checksum that the packet should have. This is used to both create the checksum beofre sending a pakcet and validate a packet after it has been received. The checksum works by taking the 1's compliment sum of the header and the data (but not the checksum).
 
 dump_packet
+This functio nprints a hex dump of the provided packet to the screen. We used it occasionally while debugging to help analyze packet componenets. 
 
 make_header
+This function takes in the fields of the header and prodces a header stucture pointer. It was useful for reducing duplicate code and perfoming necessary host to network data type conversions. The function allocates the header, so it has to be freed by the user of the function laster.
 
 get_header
+This function returns the header from a packet. It was used to reduce duplicate code and to perform network to host conversion on on data types.
 
 get_data
+This function gets a pointer to the data from a passed in packet.
 
 timestamp
+This function returns a properly formatted timestamp, allowing us to time packet propagation delay and exponentially adjust our expected latency.
 
 mylog
+This function logs a debugging message, allowing us to debug to a log throughout out project.
 
 -- Sender Specific (3600send.c)
 
@@ -61,7 +68,11 @@ Updates the timeout values for waiting for acknowledgements for sent data packet
  Challenges Faced
 ----------------------
 
+We faced a number of challenges while creating our transport protocol. The first of which was optimization of transport time and data size. We did that by implementing some of the complex features of TCP Reno described below. These posed a challenge because they forced us to completely redesign our sender's structure. When we had correctly implemented these features, we found that although our sender was better able to adapt to network latency, it often gave us a slower result. We found that this may have been because the network never dropped gongested packets, but instead just mildly delayed them. This meant that TCP-based assumptions such as "dropped packet = congestion" proved to be inaccurate.
 
+Another challenge was dynamically determining the round trip latency. This was done by adding a timestamp to each packet as it was getting sent and reading this timestamp when the ack was recieved. When the reciver got a packet, it copied this packet's timestamp to the ack packet so that the sender would receive the same timestamp it sent. This allowed us to exponetially average the expected round trip latency and dynamically adjust our timeout.
+
+Finally, while creating our checksum we faced another challenge. We initially included the checksum as part of our header structure. We found that this was very unreliable because during compilation, the checksum was moved around, and thus we could not conclusively state that the checksum would always be at the end of the header. Because of this, we moved the checksum out of the header and handled it seperately from creating the packet. The checksum was then copied right after the header so that it would remain at the top of the packet and always at the end of the header. 
 
 ----------------------
  Properties/Features
@@ -78,6 +89,8 @@ Fast Retransmit
 Upon receiving a few duplicate ACKs (currently 5) we immediately resend the packet the ACKs are looking for and go back to receiving ACKs again. This hopefully helps to quickly resend dropped or corrupted packets as we assume that most packets in our networks will be okay.
 
 Checksum
+
+To assure the integrity of each of our packets against incorrect data caused during transmission, we added a checksum on to the end of each of the headers of each packet. This checksum was an 8-bit 1's compliment sum of the rest of the header, as well as the rest of the data in the packet. This allowed for the errors in the header or the data to be detected so we can drop the packet before its false data is used. This detection is allowed because we can take the checksum delivered on the packet, as well as compute an expected checksum from the header and data of the packet, and then compare them. If these two checksums are the same, the packet is valid, if not, the packet is invalid and tossed away.
 
 ----------------------
  Testing Procedure
