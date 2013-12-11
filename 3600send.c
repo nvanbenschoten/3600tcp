@@ -195,7 +195,7 @@ int main(int argc, char *argv[]) {
     mylog("start_time.tv_sec: %d cur_time.tv_sec: %d\n", start_time.tv_sec, cur_time.tv_sec);
     //`
     int starting = 1;
-    int cur_window = 1;
+    int cur_window = 2000;
     //float window_size_exp = 0;
     int backoff = 1;
     int round_acked = 0;
@@ -239,6 +239,14 @@ int main(int argc, char *argv[]) {
             }
             mylog("[send data] %d (%d)\n", i, p_len[i%WINDOW_SIZE] - sizeof(header)); // 
             if (retransmitted) {
+                if (sendto(sock, packets[i%WINDOW_SIZE], p_len[i%WINDOW_SIZE], 0, (struct sockaddr *) &out, (socklen_t) sizeof(out)) < 0) {
+                    perror("sendto");
+                    exit(1);
+                }
+                if (sendto(sock, packets[i%WINDOW_SIZE], p_len[i%WINDOW_SIZE], 0, (struct sockaddr *) &out, (socklen_t) sizeof(out)) < 0) {
+                    perror("sendto");
+                    exit(1);
+                }
                 break;
             }
         }
@@ -260,6 +268,8 @@ int main(int argc, char *argv[]) {
                 perror("recvfrom");
                 exit(1);
             }
+            
+            unsigned char expected_checksum = get_checksum((char *)buf, NULL, 0); 
 
             header *myheader = get_header(buf);
 
@@ -270,7 +280,7 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
-            if ((myheader->magic == MAGIC) && (myheader->sequence >= p_ack) && (myheader->ack == 1)) {
+            if ((myheader->magic == MAGIC) && expected_checksum == *((unsigned char *)(buf + sizeof(header))) && (myheader->sequence >= p_ack) && (myheader->ack == 1)) {
                 mylog("[recv ack] %d\n", myheader->sequence);
 
                 if (p_ack == myheader->sequence) { // if we received a repeated ack
@@ -366,7 +376,6 @@ int main(int argc, char *argv[]) {
     }
 
     free(packet);
-
     mylog("[completed]\n");
     return 0;
 }

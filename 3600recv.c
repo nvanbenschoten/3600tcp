@@ -157,11 +157,23 @@ int main() {
                 mylog("[send ack] %d\n", current_packet-1);
 
                 header *responseheader = make_header((short)current_packet - 1, 0, myheader->eof, 1, ntohl(myheader->time));
-                if (sendto(sock, responseheader, sizeof(header), 0, (struct sockaddr *) &in, (socklen_t) sizeof(in)) < 0) {
+                
+                void *packet = malloc(sizeof(header) + sizeof(char));
+                memcpy(packet, responseheader, sizeof(header));
+
+                unsigned char *checksum = malloc(sizeof(char));
+                *checksum = get_checksum((char *)responseheader, NULL, 0);
+                memcpy(((char *) packet) +sizeof(header), (char *)checksum, sizeof(unsigned char));
+
+                free(responseheader);
+                free(checksum);
+                
+                if (sendto(sock, packet, sizeof(header) + sizeof(char), 0, (struct sockaddr *) &in, (socklen_t) sizeof(in)) < 0) {
                     perror("sendto");
                     free(buf);
                     free(data_buf);
                     free(buf_length);
+                    free(packet);
                     exit(1);
                 }
 
@@ -171,6 +183,7 @@ int main() {
                     free(buf);
                     free(data_buf);
                     free(buf_length);
+                    free(packet);
                     exit(0);
                 }
             } else {
