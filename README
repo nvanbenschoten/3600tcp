@@ -1,16 +1,23 @@
-ASCII art goes here.
-
+   __      ____     __      __   __                     
+ /'__`\   /'___\  /'__`\  /'__`\/\ \__                  
+/\_\L\ \ /\ \__/ /\ \/\ \/\ \/\ \ \ ,_\   ___   _____   
+\/_/_\_<_\ \  _``\ \ \ \ \ \ \ \ \ \ \/  /'___\/\ '__`\ 
+  /\ \L\ \\ \ \L\ \ \ \_\ \ \ \_\ \ \ \_/\ \__/\ \ \L\ \
+  \ \____/ \ \____/\ \____/\ \____/\ \__\ \____\\ \ ,__/
+   \/___/   \/___/  \/___/  \/___/  \/__/\/____/ \ \ \/ 
+                                                  \ \_\ 
+                                                   \/_/ 
 --- Team America ---
 
 Nathaniel Dempkowski and Nathan VanBenschoten
 
 ----------------------
- High Level Approach
+High Level Approach
 ----------------------
 
 To approach this project, we broke the problem into parts: a sender who creates packets, determines how much data to send at once, and delivers the data, and the receiver who takes in data as packets and returns acknowledgment packets. Like TCP, we decided upon the model of making our sender as smart and effective as possible, while generalizing the job of the receiver and making its job easy and quick.
 
-For the sender...
+For the sender we have a loop that runs until we have sent and acknowledged all of our data. This loop consists of three phases, creating packets to send, sending packets, and receiving acknowledgements. We first create packets until we fill up our window or run out of data to send. Next we send all of the packets as necessary, either sending all of the available packets in the window, or just sending one in the event of a fast retransmit. Finally we wait for received acknowledgements and process those, making adjustments to our window, timeout, and phase as necessary. We also do things like fast retransmit in response to these ACKs, which are discussed in greated detail below. In the event of a timeout we further adjust our window size and timeout. After receiving all of the ACKS for the data packets, we send the final EOF packet, which indicates that no more data will be sent, 3 times to easily ensure that it is not dropped/lost.
 
 For the receiver, 
 
@@ -48,7 +55,7 @@ get_final_packet
 Builds and returns the final packet that indicates all data has been sent. This is packet is essentially just a header with the EOF flag set and a checksum of the header attached.
 
 update_timeouts
-Updates the timeout values for waiting for acknowledgements for sent data packets. This keeps a moving exponential average of the RTT for a data packet and its acknowledgement in microseconds. This time is measured with the time field in the header, which is the time the packet was sent as the number of microseconds since the program started creating and sending packets. 
+Updates the timeout values for waiting for acknowledgements for sent data packets. This keeps a moving exponential average of the RTT for a data packet and its acknowledgement in microseconds. This time is measured with the time field in the header, which is the time the packet was sent as the number of microseconds since the program started creating and sending packets. We used this because it provided a high degree of accuracy and was easily convertible into seconds and microseconds which our timeout timeval structure used.
 
 ----------------------
  Challenges Faced
@@ -60,11 +67,17 @@ Updates the timeout values for waiting for acknowledgements for sent data packet
  Properties/Features
 ----------------------
 
+We use a variable window and timeout in our protocol to try and avoid/detect problems efficiently. We use a moving exponential average of the round-trip times of each successful data packet to try and keep our timeout as accurate as possible.
 
+Slow Start and Congestion Avoidance
 
-Slow start and congestion avoidance
+Our transport protocol has two phases of transmission to try and make as efficient use of the network as possible. In the first phase, Slow Start, we quickly scale up our window size to try and grow to accomodate many different scales of networks quickly. To do this we increase our window size by 1 for every ACK we get back during this phase. This causes the window size to double for every successful round, scaling up very quickly. This phase completes upon receiving a duplicate ACK or timing out waiting for ACKs. This generally would indicate that some sort of problem or congestion has been hit, and that we should stop scaling up as quickly. We then cut our window size in half and move to the congestion avoidance phase. In that phase we increase our window by a small number dependent on the success of the previous round. Currently we use 1 per entirely successful round, but this can be changed. If timeouts occur we then scale back down the window size.
 
-Fast retransmit
+Fast Retransmit
+
+Upon receiving a few duplicate ACKs (currently 5) we immediately resend the packet the ACKs are looking for and go back to receiving ACKs again. This hopefully helps to quickly resend dropped or corrupted packets as we assume that most packets in our networks will be okay.
+
+Checksum
 
 ----------------------
  Testing Procedure
