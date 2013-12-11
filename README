@@ -8,7 +8,38 @@ Nathaniel Dempkowski and Nathan VanBenschoten
  High Level Approach
 ----------------------
 
+To approach this project, we broke the problem into parts: a sender who creates packets, determines how much data to send at once, and delivers the data, and the receiver who takes in data as packets and returns acknowledgment packets. Like TCP, we decided upon the model of making our sender as smart and effective as possible, while generalizing the job of the receiver and making its job easy and quick.
 
+For the sender...
+
+For the receiver, 
+
+- Helper functions 
+
+-- Generic (3600sendrecv.c)
+
+get_checksum
+Takes in a header, a pakcets data, and the length of the header, and returns the checksum that the packet should have. This is used to both create the checksum beofre sending a pakcet and validate a packet after it has been received. The checksum works by taking the 1's compliment of the header and the data (but not the checksum) and 
+
+dump_packet
+
+make_header
+
+get_header
+
+get_data
+
+timestamp
+
+mylog
+
+-- Sender Specific (3600send.c)
+
+
+
+
+
+-- Receiver Specific (3600recv.c)
 
 ----------------------
  Challenges Faced
@@ -22,11 +53,15 @@ Nathaniel Dempkowski and Nathan VanBenschoten
 
 
 
+Slow start and congestion avoidance
+
+Fast retransmit
+
 ----------------------
  Testing Procedure
 ----------------------
 
-
+We based our testing on the provided test, as well as using the debug functions like dump_packet and 'print log' to make sure we were always sending and interpreting packets correctly and efficiently. During these tests we heavily used GDB to debug edge cases that we thought of and saw. Additionally, we made a few smaller testing programs to verify that our helper functions functioned correctly in all cases, allowing us to pinpoint errors that may have gone undetected otherwise. Throughout development we also modified the provided test to allow us to automatically test various specific cases. Additionally, we integrated git into our workflow as it provided a convenient tool for our workflow. In total we had ~40 commits. 
 
 ----------------------
  Bald Eagle

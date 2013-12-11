@@ -147,13 +147,13 @@ void dump_packet(unsigned char *data, int size) {
 }
 
 /**
- * Returns expected checksum from header buffer
+ * Returns expected checksum from header and data
  */
-unsigned char get_checksum(char *buf, char *data, int length) {
+unsigned char get_checksum(char *header, char *data, int length) {
     int count = sizeof(header);
     register unsigned short sum = 0;
     while (count--) {
-        sum += *buf++;
+        sum += *header++;
         if (sum & 0xFF00) {
             /* carry occurred, so wrap around */
             sum &= 0xFF;

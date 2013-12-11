@@ -101,8 +101,7 @@ int main() {
                 exit(1);
             }
 
-            //      dump_packet(buf, received);
-
+            // Calculates the expected checksum
             int dataLen = ntohs(((header *) buf)->length);
             unsigned char expected_checksum = get_checksum((char *)buf, get_data(buf), dataLen); 
 
@@ -126,6 +125,7 @@ int main() {
                     write(1, data, myheader->length);
                     current_packet++;
 
+                    // Index of the data in the buffers
                     unsigned int buffer_index = current_packet % WINDOW_SIZE;
                     
                     while(buf_length[buffer_index] > 0) {
@@ -140,6 +140,7 @@ int main() {
                     }
                 }
                 else if ((int)myheader->sequence < current_packet) {
+                    // Previously processed sequence number
                 }
                 else {
                     // Is not the current packet
@@ -156,18 +157,22 @@ int main() {
                 mylog("[recv data] %d (%d) %s\n", (int)myheader->sequence, myheader->length, "ACCEPTED (in-order)");
                 mylog("[send ack] %d\n", current_packet-1);
 
-                header *responseheader = make_header((short)current_packet - 1, 0, myheader->eof, 1, ntohl(myheader->time));
-                
+                // Create the response packet
                 void *packet = malloc(sizeof(header) + sizeof(char));
+               
+                // Add header
+                header *responseheader = make_header((short)current_packet - 1, 0, myheader->eof, 1, ntohl(myheader->time));
                 memcpy(packet, responseheader, sizeof(header));
 
+                // Add checksum
                 unsigned char *checksum = malloc(sizeof(char));
                 *checksum = get_checksum((char *)responseheader, NULL, 0);
                 memcpy(((char *) packet) +sizeof(header), (char *)checksum, sizeof(unsigned char));
 
                 free(responseheader);
                 free(checksum);
-                
+               
+                // Send ACK packet
                 if (sendto(sock, packet, sizeof(header) + sizeof(char), 0, (struct sockaddr *) &in, (socklen_t) sizeof(in)) < 0) {
                     perror("sendto");
                     free(buf);
@@ -176,7 +181,8 @@ int main() {
                     free(packet);
                     exit(1);
                 }
-
+                
+                // Exit if EOF
                 if (myheader->eof) {
                     mylog("[recv eof]\n");
                     mylog("[completed]\n");
@@ -186,10 +192,13 @@ int main() {
                     free(packet);
                     exit(0);
                 }
+
+                free(packet);
             } else {
                 mylog("[recv corrupted packet]\n");
             }
         } else {
+            // Timeout
             mylog("[error] timeout occurred\n");
             free(buf);
             free(data_buf);
