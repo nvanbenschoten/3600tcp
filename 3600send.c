@@ -43,29 +43,35 @@ int get_next_data(char *data, int size) {
  */
 void *get_next_packet(int sequence, int *len, unsigned int time) {
     char *data = malloc(DATA_SIZE);
-    int data_len = get_next_data(data, DATA_SIZE);
+    int data_len = get_next_data(data, DATA_SIZE); // get data and data length
 
-    if (data_len == 0) {
+    if (data_len == 0) { // if we got no data return NULL
         free(data);
         return NULL;
     }
 
+    // create a header with an appropriate sequence number, length and time
     header *myheader = make_header((short)sequence, data_len, 0, 0, time);
     void *packet = malloc(sizeof(header) + sizeof(char) + data_len);
     memcpy(packet, myheader, sizeof(header));
     
+    // create a checksum and append it after the header
     unsigned char *checksum = malloc(sizeof(char));
     *checksum = get_checksum((char *)myheader, data, data_len);
     memcpy(((char *) packet) +sizeof(header), (char *)checksum, sizeof(unsigned char));
    
+    // append the data to the packet
     memcpy(((char *) packet) +sizeof(header)+sizeof(char), data, data_len);
 
+    // free allocated things that aren't the packet
     free(data);
     free(checksum);
     free(myheader);
 
+    // measure the length
     *len = sizeof(header) + sizeof(char) + data_len;
 
+    // return completed packet
     return packet;
 }
 
@@ -73,22 +79,30 @@ void *get_next_packet(int sequence, int *len, unsigned int time) {
 /**
  * Builds and returns the final EOF packet.
  */
-
 void *get_final_packet() {
+    // get the current time
     gettimeofday(&cur_time, NULL);
-    elapsed_time = (unsigned int)(cur_time.tv_sec*1000000 + cur_time.tv_usec)-(start_time.tv_sec*100000+start_time.tv_usec);
-    header *myheader = make_header(p_created, 0, 1, 0, elapsed_time);
 
+    // get the elapsed time since the program started creating packets
+    elapsed_time = (unsigned int)(cur_time.tv_sec*1000000 + cur_time.tv_usec)-(start_time.tv_sec*100000+start_time.tv_usec);
+
+    // make a header with the EOF flag set
+    header *myheader = make_header(p_created, 0, 1, 0, elapsed_time);
     void *packet = malloc(sizeof(header) + sizeof(char));
     memcpy(packet, myheader, sizeof(header));
 
+    // create a checksum for that header
     unsigned char *checksum = malloc(sizeof(char));
     *checksum = get_checksum((char *)myheader, NULL, 0);
+
+    // combine the two into a packet
     memcpy(((char *) packet) +sizeof(header), (char *)checksum, sizeof(unsigned char));
 
+    // free everything besides the packet
     free(myheader);
     free(checksum);
 
+    // return completed packet
     return packet;
 }
 
@@ -96,16 +110,17 @@ void *get_final_packet() {
  * Updates the timeout values for sent packets based on the RTT of a data send + ACK.
  * Keeps a moving average to variable adjust timeout.
  */
-
 void update_timeouts(unsigned int time) {
+    // convert the time from network time
     time = ntohl(time);
+    // get the current time
     gettimeofday(&cur_time, NULL);
+    // calculate the elapsed time since the program started creating packets in microseconds
     elapsed_time = (unsigned int)(cur_time.tv_sec*1000000 + cur_time.tv_usec)-(start_time.tv_sec*100000+start_time.tv_usec);
-    unsigned int rtt = elapsed_time - time;
+    unsigned int rtt = elapsed_time - time; // calculate round-trip time
+    // update second and microsecond timeouts accordingly
     timeout_sec = timeout_sec*RTT_DECAY + (1-RTT_DECAY)*(rtt)/1000000;
     timeout_usec =  timeout_usec*RTT_DECAY + ((unsigned int)((1.0-RTT_DECAY)*(rtt)))%1000000;
-    mylog("time: %u elapsed_time: %u timeout_sec: %u timeout_usec: %u rtt: %u\n", time, elapsed_time, timeout_sec, timeout_usec, rtt);
-    //mylog("Set timeout_usec to %u\n", timeout_usec);
 }
 
 int main(int argc, char *argv[]) {

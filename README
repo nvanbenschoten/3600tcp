@@ -35,11 +35,20 @@ mylog
 
 -- Sender Specific (3600send.c)
 
+usage
+Prints command-line usage information for the 3600send program.
 
+get_next_data
+Reads the next block of data from STDIN of a certain size.
 
+get_next_packet
+Builds and returns the next packet in the sequence if there is more data to create packets for. This first creates a header for the packet, including information like the sequence number, length, and time. It then inserts the checksum in the packet, which is a checksum of both the header and the data combined. The data is then inserted into the packet, and a pointer to the packet is returned.
 
+get_final_packet
+Builds and returns the final packet that indicates all data has been sent. This is packet is essentially just a header with the EOF flag set and a checksum of the header attached.
 
--- Receiver Specific (3600recv.c)
+update_timeouts
+Updates the timeout values for waiting for acknowledgements for sent data packets. This keeps a moving exponential average of the RTT for a data packet and its acknowledgement in microseconds. This time is measured with the time field in the header, which is the time the packet was sent as the number of microseconds since the program started creating and sending packets. 
 
 ----------------------
  Challenges Faced
